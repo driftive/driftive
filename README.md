@@ -1,9 +1,13 @@
+<p align="center">
+  <img width="300" height="300" src="assets/driftive.png">
+</p>
+
 # Driftive
 
 Driftive is a simple tool for detecting drift in Terragrunt/Terraform projects.
 Currently, it supports only Terragrunt projects.
 
-# Usage
+## Usage
 
 CLI usage:
 ```bash 
@@ -16,7 +20,7 @@ docker pull driftive/driftive:0.2.0
 docker run driftive/driftive:0.2.0 --help
 ```
 
-# Output example
+### Output example
 
 A message will be sent in the Slack channel if any state drift is detected.
 Example:
