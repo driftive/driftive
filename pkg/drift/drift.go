@@ -1,7 +1,7 @@
 package drift
 
 import (
-	"drifter/pkg/exec"
+	"driftive/pkg/exec"
 	"fmt"
 	"os"
 	"path/filepath"

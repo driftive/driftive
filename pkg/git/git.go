@@ -1,8 +1,8 @@
 package git
 
 import (
-	"drifter/pkg/exec"
-	"drifter/pkg/utils"
+	"driftive/pkg/exec"
+	"driftive/pkg/utils"
 	"fmt"
 )
 

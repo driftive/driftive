@@ -1,9 +1,9 @@
 package main
 
 import (
-	"drifter/pkg/drift"
-	"drifter/pkg/git"
-	"drifter/pkg/notification"
+	"driftive/pkg/drift"
+	"driftive/pkg/git"
+	"driftive/pkg/notification"
 	"flag"
 	"fmt"
 	"os"

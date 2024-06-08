@@ -2,7 +2,7 @@ package notification
 
 import (
 	"bytes"
-	"drifter/pkg/drift"
+	"driftive/pkg/drift"
 	"encoding/json"
 	"fmt"
 	"io"
