@@ -1,7 +1,7 @@
 package main
 
 import (
-	"drifter/pkg"
+	"drifter/pkg/drift"
 	"drifter/pkg/git"
 	"drifter/pkg/notification"
 	"flag"
@@ -49,11 +49,13 @@ func main() {
 	var slackWebhookUrl string
 	var branch string
 	var repositoryPath string
+	var concurrency int
 
 	flag.StringVar(&repositoryPath, "repo-path", "", "Path to the repository. If provided, the repository will not be cloned.")
 	flag.StringVar(&repositoryUrl, "repo-url", "", "e.g. https://<token>@github.com/<org>/<repo>. If repo-path is provided, this is ignored.")
 	flag.StringVar(&branch, "branch", "", "Repository branch")
 	flag.StringVar(&slackWebhookUrl, "slack-url", "", "Slack webhook URL")
+	flag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent projects to check. Defaults to 4.")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, slackWebhookUrl, branch)
@@ -64,20 +66,19 @@ func main() {
 		defer os.RemoveAll(repoDir)
 	}
 
-	projects := pkg.DetectTerragruntProjects(repoDir)
-	println(fmt.Sprintf("Detected %d projects", len(projects)))
-	driftResult := pkg.DetectDrift(repoDir, projects)
+	driftDetector := drift.NewDriftDetector(repoDir, concurrency)
+	analysisResult := driftDetector.DetectDrift()
 
-	if driftResult.TotalDrifted > 0 {
-		fmt.Println("Drifted projects: ", driftResult.TotalDrifted)
+	if analysisResult.TotalDrifted > 0 {
+		fmt.Println("Drifted projects: ", analysisResult.TotalDrifted)
 		println("Sending notification to slack...")
 		slack := notification.Slack{Url: slackWebhookUrl}
-		slack.Send(driftResult)
+		slack.Send(analysisResult)
 	} else {
 		fmt.Println("No drifts detected")
 	}
 
-	if driftResult.TotalDrifted > 0 {
+	if analysisResult.TotalDrifted > 0 {
 		os.Exit(1)
 	}
 

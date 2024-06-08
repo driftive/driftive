@@ -2,7 +2,7 @@ package notification
 
 import (
 	"bytes"
-	"drifter/pkg"
+	"drifter/pkg/drift"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,12 +13,12 @@ type Slack struct {
 	Url string
 }
 
-func (slack Slack) Send(driftResult pkg.DriftDetectionResult) error {
+func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 	httpClient := &http.Client{}
-	message := fmt.Sprintf(":bangbang: Drift detected in Terragrunt projects\n")
-	message += fmt.Sprintf("Projects checked: %d/%d\n", driftResult.TotalChecked, driftResult.TotalProjects)
-	message += fmt.Sprintf("Drifted: %d\n", driftResult.TotalDrifted)
-	message += fmt.Sprintf("Drifted projects: :point_down: \n\n```")
+	message := fmt.Sprintf(":bangbang: State Drift detected in Terragrunt projects\n")
+	message += fmt.Sprintf(":gear: Drifts `%d`/`%d`\n", driftResult.TotalDrifted, driftResult.TotalProjects)
+	message += fmt.Sprintf(":clock1: Analysis duration `%s`\n", driftResult.Duration.String())
+	message += fmt.Sprintf(":point_down: Projects with state drifts \n\n```")
 	for _, project := range driftResult.DriftedProjects {
 		message += fmt.Sprintf("%s\n", project.Project)
 	}
