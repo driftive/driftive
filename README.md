@@ -7,6 +7,19 @@
 Driftive is a simple tool for detecting drift in Terragrunt/Terraform projects.
 Currently, it supports only Terragrunt projects.
 
+## Features
+* Concurrently analyze multiple projects
+* Notifies about drifts in Slack
+
+## Installation
+
+### CLI
+
+Homebrew
+```bash
+$ brew install driftive/tap/driftive
+```
+
 ## Usage
 
 CLI usage:
@@ -35,3 +48,5 @@ my/project1
 my/project2
 ```
 ````
+
+
