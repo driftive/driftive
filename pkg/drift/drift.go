@@ -98,10 +98,13 @@ func (d DriftDetector) detectDrift(dir string) (bool, error) {
 	result, err := exec.RunCommandInDir(dir, "terragrunt", "init", "-upgrade", "-lock=false")
 	if err != nil {
 		println(fmt.Sprintf("Error running init command in %s: %v", dir, err))
+		println(result)
 		return false, err
 	}
 	result, err = exec.RunCommandInDir(dir, "terragrunt", "plan", "-lock=false")
 	if err != nil {
+		println(fmt.Sprintf("Error running plan command in %s: %v", dir, err))
+		println(result)
 		return false, err
 	}
 	return d.isDriftDetected(result), nil
