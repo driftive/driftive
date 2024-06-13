@@ -16,8 +16,8 @@ func validateArgs(repositoryUrl, repositoryPath, slackWebhookUrl, branch string)
 	if slackWebhookUrl == "" {
 		panic("Slack webhook URL is required")
 	}
-	if branch == "" {
-		panic("Branch is required")
+	if branch == "" && repositoryPath == "" {
+		panic("Branch is required if repository URL is provided")
 	}
 }
 
