@@ -2,7 +2,7 @@ package drift
 
 import (
 	"driftive/pkg/exec"
-	"fmt"
+	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,22 +39,21 @@ func (d DriftDetector) detectDriftConcurrently(sem chan struct{}, wg *sync.WaitG
 	defer wg.Done()
 	result, err := d.detectDrift(dir)
 	if err != nil {
-		println(fmt.Sprintf("Error checking drift in %s: %v", dir, err))
+		log.Info().Msgf("Error checking drift in %s: %v", dir, err)
 	}
 	if result {
-		println(fmt.Sprintf("Drift detected in project %s", projectDir))
+		log.Info().Msgf("Drift detected in project %s", projectDir)
 		results <- DriftProjectResult{Project: projectDir, Drifted: result}
 	}
 }
 
 func (d DriftDetector) DetectDrift() DriftDetectionResult {
-
-	println(fmt.Sprintf("Starting drift analysis in %s. Concurrency: %d", d.RepoDir, d.Concurrency))
+	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", d.RepoDir, d.Concurrency)
 
 	projectDirs := d.DetectTerragruntProjects(d.RepoDir)
-	println(fmt.Sprintf("Detected %d projects", len(projectDirs)))
+	log.Info().Msgf("Detected %d projects", len(projectDirs))
 
-	var driftedProjects []DriftProjectResult
+	driftedProjects := make([]DriftProjectResult, 0)
 	var totalProjects = len(projectDirs)
 	var totalChecked = 0
 
@@ -71,7 +70,7 @@ func (d DriftDetector) DetectDrift() DriftDetectionResult {
 		}
 
 		totalChecked++
-		println(fmt.Sprintf("Checking drift in project %d/%d: %s", idx+1, totalProjects, projectDir))
+		log.Info().Msgf("Checking drift in project %d/%d: %s", idx+1, totalProjects, projectDir)
 		wg.Add(1)
 		sem <- struct{}{}
 		go d.detectDriftConcurrently(sem, &wg, results, dir, projectDir)
@@ -97,14 +96,14 @@ func (d DriftDetector) DetectDrift() DriftDetectionResult {
 func (d DriftDetector) detectDrift(dir string) (bool, error) {
 	result, err := exec.RunCommandInDir(dir, "terragrunt", "init", "-upgrade", "-lock=false")
 	if err != nil {
-		println(fmt.Sprintf("Error running init command in %s: %v", dir, err))
-		println(result)
+		log.Info().Msgf("Error running init command in %s: %v", dir, err)
+		log.Info().Msg(result)
 		return false, err
 	}
 	result, err = exec.RunCommandInDir(dir, "terragrunt", "plan", "-lock=false")
 	if err != nil {
-		println(fmt.Sprintf("Error running plan command in %s: %v", dir, err))
-		println(result)
+		log.Info().Msgf("Error running plan command in %s: %v", dir, err)
+		log.Info().Msg(result)
 		return false, err
 	}
 	return d.isDriftDetected(result), nil
@@ -141,7 +140,7 @@ func (d DriftDetector) DetectTerragruntProjects(dir string) []string {
 	})
 
 	if err != nil {
-		fmt.Printf("Error walking the path %v: %v\n", dir, err)
+		log.Info().Msgf("Error walking the path %v: %v\n", dir, err)
 		return nil
 	}
 
