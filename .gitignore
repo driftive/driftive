@@ -1,3 +1,4 @@
 .idea/
-
+**/.terraform/
+**/.terragrunt-cache/
 dist/
