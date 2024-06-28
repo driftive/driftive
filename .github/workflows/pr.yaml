@@ -2,6 +2,7 @@ name: PR
 
 on:
   pull_request:
+  push:
 
 jobs:
   build:
@@ -26,3 +27,11 @@ jobs:
           distribution: goreleaser
           version: '~> v2'
           args: release --snapshot --clean
+
+      - name: Run testdata test
+        run: |
+          go build -o driftive-test
+          ./driftive-test --repo-path=./testdata/ > result.txt
+          cat result.txt | grep -q "Drift detected in project testdata/gh-file-drift-foo" && exit 1 || exit 0
+          
+          
