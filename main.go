@@ -16,9 +16,6 @@ func validateArgs(repositoryUrl, repositoryPath, slackWebhookUrl, branch string)
 	if repositoryUrl == "" && repositoryPath == "" {
 		panic("Repository URL or path is required")
 	}
-	if slackWebhookUrl == "" {
-		panic("Slack webhook URL is required")
-	}
 	if branch == "" && repositoryPath == "" {
 		panic("Branch is required if repository URL is provided")
 	}
@@ -82,6 +79,14 @@ func main() {
 		log.Info().Msg("Sending notification to slack...")
 		slack := notification.Slack{Url: slackWebhookUrl}
 		slack.Send(analysisResult)
+		if slackWebhookUrl != "" {
+			log.Info().Msg("Sending notification to slack...")
+			slack := notification.Slack{Url: slackWebhookUrl}
+			err := slack.Send(analysisResult)
+			if err != nil {
+				log.Error().Msgf("Failed to send slack notification. %v", err)
+			}
+		}
 	} else {
 		log.Info().Msg("No drifts detected")
 	}
