@@ -32,6 +32,5 @@ jobs:
         run: |
           go build -o driftive-test
           ./driftive-test --repo-path=./testdata/ > result.txt
-          cat result.txt | grep -q "Drift detected in project testdata/gh-file-drift-foo" && exit 1 || exit 0
-          
+          cat result.txt | grep "Drift detected in project testdata/gh-file-drift-foo" || exit 1
           

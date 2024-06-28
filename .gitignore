@@ -3,3 +3,4 @@
 **/.terragrunt-cache/
 dist/
 /driftive-test
+result.txt
