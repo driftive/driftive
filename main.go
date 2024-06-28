@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
-	"time"
 )
 
 func validateArgs(repositoryUrl, repositoryPath, slackWebhookUrl, branch string) {
@@ -44,7 +43,7 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 }
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
 
 	var repositoryUrl string
 	var slackWebhookUrl string
@@ -52,6 +51,7 @@ func main() {
 	var repositoryPath string
 	var concurrency int
 	var logLevel string
+	var disableStdoutResult bool
 
 	flag.StringVar(&repositoryPath, "repo-path", "", "Path to the repository. If provided, the repository will not be cloned.")
 	flag.StringVar(&repositoryUrl, "repo-url", "", "e.g. https://<token>@github.com/<org>/<repo>. If repo-path is provided, this is ignored.")
@@ -59,6 +59,7 @@ func main() {
 	flag.StringVar(&slackWebhookUrl, "slack-url", "", "Slack webhook URL")
 	flag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent projects to check. Defaults to 4.")
 	flag.StringVar(&logLevel, "log-level", "info", "Log level. Options: trace, debug, info, warn, error, fatal, panic")
+	flag.BoolVar(&disableStdoutResult, "disable-stdout", false, "Disable printing drift results to stdout")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, slackWebhookUrl, branch)
@@ -75,16 +76,20 @@ func main() {
 	analysisResult := driftDetector.DetectDrift()
 
 	if analysisResult.TotalDrifted > 0 {
-		log.Info().Msgf("Drifted projects: %d", analysisResult.TotalDrifted)
-		log.Info().Msg("Sending notification to slack...")
-		slack := notification.Slack{Url: slackWebhookUrl}
-		slack.Send(analysisResult)
 		if slackWebhookUrl != "" {
 			log.Info().Msg("Sending notification to slack...")
 			slack := notification.Slack{Url: slackWebhookUrl}
 			err := slack.Send(analysisResult)
 			if err != nil {
 				log.Error().Msgf("Failed to send slack notification. %v", err)
+			}
+		}
+
+		if !disableStdoutResult {
+			stdout := notification.NewStdout()
+			err := stdout.Send(analysisResult)
+			if err != nil {
+				log.Error().Msgf("Failed to print drifts to stdout. %v", err)
 			}
 		}
 	} else {
