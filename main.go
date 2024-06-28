@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-func validateArgs(repositoryUrl, repositoryPath, slackWebhookUrl, branch string) {
+func validateArgs(repositoryUrl, repositoryPath, branch string) {
 	if repositoryUrl == "" && repositoryPath == "" {
 		panic("Repository URL or path is required")
 	}
@@ -62,7 +62,7 @@ func main() {
 	flag.BoolVar(&disableStdoutResult, "disable-stdout", false, "Disable printing drift results to stdout")
 	flag.Parse()
 
-	validateArgs(repositoryUrl, repositoryPath, slackWebhookUrl, branch)
+	validateArgs(repositoryUrl, repositoryPath, branch)
 
 	zerolog.SetGlobalLevel(utils.ParseLogLevel(logLevel))
 
