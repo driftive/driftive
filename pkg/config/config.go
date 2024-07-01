@@ -14,10 +14,11 @@ type Config struct {
 
 	LogLevel string `json:"log_level" yaml:"log_level"`
 
-	DisableStdoutResult bool   `json:"disable_stdout_result" yaml:"disable_stdout_result"`
-	SlackWebhookUrl     string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
-	GithubToken         string `json:"github_token" yaml:"github_token"`
-	GithubContext       *gh.GithubActionContext
+	EnableStdoutResult bool   `json:"stdout_result" yaml:"stdout_result"`
+	EnableGithubIssues bool   `json:"github_issues" yaml:"github_issues"`
+	SlackWebhookUrl    string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
+	GithubToken        string `json:"github_token" yaml:"github_token"`
+	GithubContext      *gh.GithubActionContext
 }
 
 func validateArgs(repositoryUrl, repositoryPath, branch string) {
@@ -36,8 +37,9 @@ func ParseConfig() Config {
 	var repositoryPath string
 	var concurrency int
 	var logLevel string
-	var disableStdoutResult bool
+	var enableStdoutResult bool
 	var githubToken string
+	var enableGithubIssues bool
 
 	flag.StringVar(&repositoryPath, "repo-path", "", "Path to the repository. If provided, the repository will not be cloned.")
 	flag.StringVar(&repositoryUrl, "repo-url", "", "e.g. https://<token>@github.com/<org>/<repo>. If repo-path is provided, this is ignored.")
@@ -45,8 +47,9 @@ func ParseConfig() Config {
 	flag.StringVar(&slackWebhookUrl, "slack-url", "", "Slack webhook URL")
 	flag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent projects to check. Defaults to 4.")
 	flag.StringVar(&logLevel, "log-level", "info", "Log level. Options: trace, debug, info, warn, error, fatal, panic")
-	flag.BoolVar(&disableStdoutResult, "disable-stdout", false, "Disable printing drift results to stdout")
+	flag.BoolVar(&enableStdoutResult, "stdout", true, "Enable printing drift results to stdout")
 	flag.StringVar(&githubToken, "github-token", "", "Github token")
+	flag.BoolVar(&enableGithubIssues, "github-issues", true, "Enable creating Github issues for drifts, if running in Github Actions.")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, branch)
@@ -58,14 +61,15 @@ func ParseConfig() Config {
 	}
 
 	return Config{
-		RepositoryUrl:       repositoryUrl,
-		Branch:              branch,
-		RepositoryPath:      repositoryPath,
-		Concurrency:         concurrency,
-		LogLevel:            logLevel,
-		DisableStdoutResult: disableStdoutResult,
-		SlackWebhookUrl:     slackWebhookUrl,
-		GithubToken:         githubToken,
-		GithubContext:       ghContext,
+		RepositoryUrl:      repositoryUrl,
+		Branch:             branch,
+		RepositoryPath:     repositoryPath,
+		Concurrency:        concurrency,
+		LogLevel:           logLevel,
+		EnableStdoutResult: enableStdoutResult,
+		EnableGithubIssues: enableGithubIssues,
+		SlackWebhookUrl:    slackWebhookUrl,
+		GithubToken:        githubToken,
+		GithubContext:      ghContext,
 	}
 }

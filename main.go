@@ -59,7 +59,7 @@ func main() {
 			}
 		}
 
-		if !cfg.DisableStdoutResult {
+		if cfg.EnableStdoutResult {
 			stdout := notification.NewStdout()
 			err := stdout.Send(analysisResult)
 			if err != nil {

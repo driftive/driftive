@@ -30,7 +30,10 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 
 	for _, issue := range openIssues {
 		if issue.GetTitle() == issueTitle && issue.GetBody() == issueBody {
-			log.Info().Msgf("Issue already exists for project %s", project.Project)
+			log.Info().Msgf("Issue already exists for project %s (repo: %s/%s)",
+				project.Project,
+				g.config.GithubContext.RepositoryOwner,
+				g.config.GithubContext.Repository)
 			return
 		}
 	}
