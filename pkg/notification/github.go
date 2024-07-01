@@ -93,7 +93,6 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 }
 
 func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
-
 	if g.config.GithubContext.Repository == "" || g.config.GithubContext.RepositoryOwner == "" {
 		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
 		return
