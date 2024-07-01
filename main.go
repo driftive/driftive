@@ -1,24 +1,15 @@
 package main
 
 import (
+	"driftive/pkg/config"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
 	"driftive/pkg/notification"
 	"driftive/pkg/utils"
-	"flag"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
 )
-
-func validateArgs(repositoryUrl, repositoryPath, branch string) {
-	if repositoryUrl == "" && repositoryPath == "" {
-		panic("Repository URL or path is required")
-	}
-	if branch == "" && repositoryPath == "" {
-		panic("Branch is required if repository URL is provided")
-	}
-}
 
 // determineRepositoryDir returns the repository path to use. If repositoryPath is provided, it is returned. Otherwise, the repositoryUrl is returned.
 // The second return value is true if the repositoryPath should be deleted after the program finishes.
@@ -45,52 +36,41 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
 
-	var repositoryUrl string
-	var slackWebhookUrl string
-	var branch string
-	var repositoryPath string
-	var concurrency int
-	var logLevel string
-	var disableStdoutResult bool
+	cfg := config.ParseConfig()
 
-	flag.StringVar(&repositoryPath, "repo-path", "", "Path to the repository. If provided, the repository will not be cloned.")
-	flag.StringVar(&repositoryUrl, "repo-url", "", "e.g. https://<token>@github.com/<org>/<repo>. If repo-path is provided, this is ignored.")
-	flag.StringVar(&branch, "branch", "", "Repository branch")
-	flag.StringVar(&slackWebhookUrl, "slack-url", "", "Slack webhook URL")
-	flag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent projects to check. Defaults to 4.")
-	flag.StringVar(&logLevel, "log-level", "info", "Log level. Options: trace, debug, info, warn, error, fatal, panic")
-	flag.BoolVar(&disableStdoutResult, "disable-stdout", false, "Disable printing drift results to stdout")
-	flag.Parse()
+	zerolog.SetGlobalLevel(utils.ParseLogLevel(cfg.LogLevel))
 
-	validateArgs(repositoryUrl, repositoryPath, branch)
-
-	zerolog.SetGlobalLevel(utils.ParseLogLevel(logLevel))
-
-	repoDir, shouldDelete := determineRepositoryDir(repositoryUrl, repositoryPath, branch)
+	repoDir, shouldDelete := determineRepositoryDir(cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
 	if shouldDelete {
 		log.Debug().Msg("Temp dir will be deleted after the program finishes")
 		defer os.RemoveAll(repoDir)
 	}
 
-	driftDetector := drift.NewDriftDetector(repoDir, concurrency)
+	driftDetector := drift.NewDriftDetector(repoDir, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
 
 	if analysisResult.TotalDrifted > 0 {
-		if slackWebhookUrl != "" {
+		if cfg.SlackWebhookUrl != "" {
 			log.Info().Msg("Sending notification to slack...")
-			slack := notification.Slack{Url: slackWebhookUrl}
+			slack := notification.Slack{Url: cfg.SlackWebhookUrl}
 			err := slack.Send(analysisResult)
 			if err != nil {
 				log.Error().Msgf("Failed to send slack notification. %v", err)
 			}
 		}
 
-		if !disableStdoutResult {
+		if !cfg.DisableStdoutResult {
 			stdout := notification.NewStdout()
 			err := stdout.Send(analysisResult)
 			if err != nil {
 				log.Error().Msgf("Failed to print drifts to stdout. %v", err)
 			}
+		}
+
+		if cfg.GithubToken != "" && cfg.GithubContext != nil {
+			log.Info().Msg("Sending notification to github...")
+			gh := notification.NewGithubIssueNotification(&cfg)
+			gh.Send(analysisResult)
 		}
 	} else {
 		log.Info().Msg("No drifts detected")

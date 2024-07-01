@@ -21,8 +21,9 @@ type DriftDetector struct {
 }
 
 type DriftProjectResult struct {
-	Project string
-	Drifted bool
+	Project   string
+	Drifted   bool
+	Succeeded bool
 }
 
 type DriftDetectionResult struct {
