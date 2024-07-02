@@ -53,7 +53,9 @@ func (d *DriftDetector) detectDriftConcurrently(dir string, projectDir string) {
 	if err != nil {
 		log.Info().Msgf("Error checking drift in %s: %v", dir, err)
 	}
-	log.Info().Msgf("Drift detected in project %s", projectDir)
+	if result {
+		log.Info().Msgf("Drift detected in project %s", projectDir)
+	}
 	d.results <- DriftProjectResult{Project: projectDir, Drifted: result}
 }
 
