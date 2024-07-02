@@ -18,7 +18,7 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 		return repositoryPath, false
 	}
 
-	createdDir, err := os.MkdirTemp("", "drifter")
+	createdDir, err := os.MkdirTemp("", "driftive")
 	if err != nil {
 		panic(err)
 	}
