@@ -10,20 +10,6 @@ import (
 	"strings"
 )
 
-type ExecutableType string
-
-type Rule struct {
-	Pattern    string `json:"pattern" yaml:"pattern"`
-	Executable string `json:"executable" yaml:"executable" validate:"omitempty,oneof=terraform tofu terragrunt"`
-	Ignore     bool   `json:"ignore" yaml:"ignore"`
-}
-
-type ProjectsConfig struct {
-	Inclusions []string `json:"inclusions" yaml:"inclusions"`
-	Exclusions []string `json:"exclusions" yaml:"exclusions"`
-	Rules      []Rule   `json:"rules" yaml:"rules"`
-}
-
 func executableToProjectType(executable string) ProjectType {
 	switch executable {
 	case "terraform":
@@ -66,10 +52,10 @@ func isPartOfCacheFolder(dir string) bool {
 	return strings.Contains(dir, ".terragrunt-cache") || strings.Contains(dir, ".terraform")
 }
 
-func GetProjectsByRules(rootDir string, config *ProjectsConfig) []Project {
+func AutoDiscoverProjects(rootDir string, config *DriftiveRepoConfig) []Project {
 	projs := getAllPossibleProjectPaths(rootDir, config)
 	mapProjects := make(map[string]*Project)
-	rules := config.Rules
+	rules := config.AutoDiscover.ProjectRules
 
 	for _, proj := range projs {
 		for _, rule := range rules {
@@ -90,17 +76,11 @@ func GetProjectsByRules(rootDir string, config *ProjectsConfig) []Project {
 				if err != nil {
 					return err
 				}
-
 				if match {
-					if rule.Ignore {
-						return nil
-					}
-
 					projectType := executableToProjectType(rule.Executable)
 					project := &Project{
-						Dir:     proj,
-						Type:    projectType,
-						Ignored: false,
+						Dir:  proj,
+						Type: projectType,
 					}
 					mapProjects[proj] = project
 					return filepath.SkipAll
@@ -177,14 +157,14 @@ func getAllFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-func getAllPossibleProjectPaths(root string, config *ProjectsConfig) []string {
+func getAllPossibleProjectPaths(root string, config *DriftiveRepoConfig) []string {
 	allFiles, err := getAllFiles(root)
 	if err != nil {
 		log.Error().Msgf("Error getting all files in %v: %v", root, err)
 		return nil
 	}
 
-	filteredFiles, err := filterPaths(allFiles, config.Inclusions, config.Exclusions)
+	filteredFiles, err := filterPaths(allFiles, config.AutoDiscover.Inclusions, config.AutoDiscover.Exclusions)
 	if err != nil {
 		log.Error().Msgf("Error filtering files: %v\n", err)
 		return nil

@@ -11,13 +11,12 @@ import (
 )
 
 type DriftDetector struct {
-	RepoDir       string
-	Concurrency   int
-	workerWg      sync.WaitGroup
-	results       chan DriftProjectResult
-	totalProjects int
-	projectDirs   []string
-	semaphore     chan struct{}
+	RepoDir     string
+	Projects    []config.Project
+	Concurrency int
+	workerWg    sync.WaitGroup
+	results     chan DriftProjectResult
+	semaphore   chan struct{}
 }
 
 type DriftProjectResult struct {
@@ -34,9 +33,10 @@ type DriftDetectionResult struct {
 	Duration        time.Duration
 }
 
-func NewDriftDetector(repoDir string, concurrency int) DriftDetector {
+func NewDriftDetector(repoDir string, projects []config.Project, concurrency int) DriftDetector {
 	return DriftDetector{
 		RepoDir:     repoDir,
+		Projects:    projects,
 		Concurrency: concurrency,
 		workerWg:    sync.WaitGroup{},
 		results:     nil,
@@ -61,28 +61,22 @@ func (d *DriftDetector) detectDriftConcurrently(dir string, projectDir string) {
 
 func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", d.RepoDir, d.Concurrency)
-
-	d.projectDirs = config.DetectTerragruntProjects(d.RepoDir)
-	log.Info().Msgf("Detected %d projects", len(d.projectDirs))
-	d.totalProjects = len(d.projectDirs)
-	d.results = make(chan DriftProjectResult, d.totalProjects)
-
+	d.results = make(chan DriftProjectResult, len(d.Projects))
 	var totalChecked = 0
-
 	startTime := time.Now()
 
-	for idx, dir := range d.projectDirs {
-		projectDir := strings.TrimPrefix(strings.Replace(dir, d.RepoDir, "", -1), "/")
+	for idx, proj := range d.Projects {
+		projectDir := strings.TrimPrefix(strings.Replace(proj.Dir, d.RepoDir, "", -1), "/")
 
 		if projectDir == "" {
 			continue
 		}
 
 		totalChecked++
-		log.Info().Msgf("Checking drift in project %d/%d: %s", idx+1, d.totalProjects, projectDir)
+		log.Info().Msgf("Checking drift in project %d/%d: %s", idx+1, len(d.Projects), projectDir)
 		d.workerWg.Add(1)
 		d.semaphore <- struct{}{}
-		go d.detectDriftConcurrently(dir, projectDir)
+		go d.detectDriftConcurrently(proj.Dir, projectDir)
 	}
 
 	d.workerWg.Wait()
@@ -98,8 +92,8 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	result := DriftDetectionResult{
 		DriftedProjects: driftedProjects,
 		TotalDrifted:    len(driftedProjects),
-		TotalProjects:   d.totalProjects,
-		TotalChecked:    d.totalProjects,
+		TotalProjects:   len(d.Projects),
+		TotalChecked:    len(d.Projects),
 		Duration:        time.Since(startTime),
 	}
 	return result
