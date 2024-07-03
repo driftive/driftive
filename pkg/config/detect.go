@@ -178,7 +178,6 @@ func getAllFiles(root string) ([]string, error) {
 }
 
 func getAllPossibleProjectPaths(root string, config *ProjectsConfig) []string {
-
 	allFiles, err := getAllFiles(root)
 	if err != nil {
 		log.Error().Msgf("Error getting all files in %v: %v", root, err)

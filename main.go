@@ -5,9 +5,9 @@ import (
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
 	"driftive/pkg/notification"
-	"driftive/pkg/utils"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v2"
 	"os"
 )
 
@@ -35,14 +35,26 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
-
 	cfg := config.ParseConfig()
 
-	zerolog.SetGlobalLevel(utils.ParseLogLevel(cfg.LogLevel))
+	showInitMessage(cfg)
+
+	projectsCfg := &config.ProjectsConfig{}
+	fileContent, err := os.ReadFile("testdata/rules/detection_rules.yml")
+	if err != nil {
+		log.Fatal().Msgf("Failed to read detection rules. %v", err)
+	}
+	err = yaml.Unmarshal(fileContent, &projectsCfg)
+	if err != nil {
+		log.Fatal().Msgf("Failed to parse detection rules. %v", err)
+	}
+
+	projects := config.GetProjectsByRules(cfg.RepositoryPath, projectsCfg)
+	log.Info().Msgf("Projects detected: %d", len(projects))
 
 	repoDir, shouldDelete := determineRepositoryDir(cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
 	if shouldDelete {
-		log.Debug().Msg("Temp dir will be deleted after the program finishes")
+		log.Debug().Msg("Temp dir will be deleted after driftive finishes.")
 		defer os.RemoveAll(repoDir)
 	}
 
@@ -78,5 +90,26 @@ func main() {
 
 	if analysisResult.TotalDrifted > 0 {
 		os.Exit(1)
+	}
+}
+
+func parseOnOff(enabled bool) string {
+	if enabled {
+		return "on"
+	}
+	return "off"
+}
+
+func showInitMessage(cfg config.DriftiveConfig) {
+	log.Info().Msg("Starting driftive...")
+	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s",
+		cfg.Concurrency,
+		parseOnOff(cfg.EnableGithubIssues),
+		parseOnOff(cfg.SlackWebhookUrl != ""))
+
+	if cfg.EnableGithubIssues && (cfg.GithubToken == "" || cfg.GithubContext == nil || cfg.GithubContext.Repository == "" || cfg.GithubContext.RepositoryOwner == "") {
+		log.Fatal().Msg("Github issues are enabled but the required Github token or context is not provided. " +
+			"Use the --github-token flag or set the GITHUB_TOKEN environment variable. " +
+			"Also, ensure that the GITHUB_CONTEXT environment variable is set in Github Actions.")
 	}
 }

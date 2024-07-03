@@ -1,0 +1,20 @@
+inclusions:
+  - '**/*.tf'
+  - '**/*.tfvars'
+  - '**/terragrunt.hcl'
+
+exclusions:
+  - '**/modules/**'
+  - '**/.terragrunt-cache/**'
+  - '**/.terraform/**'
+  - '/terragrunt.hcl'
+
+rules:
+  - pattern: 'terragrunt.hcl'
+    executable: 'terragrunt'
+
+  - pattern: "*.tf"
+    executable: "terraform"
+
+  - pattern: "*.tfvars"
+    executable: "terraform"
