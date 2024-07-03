@@ -15,10 +15,10 @@ const (
 )
 
 type GithubIssueNotification struct {
-	config *config.Config
+	config *config.DriftiveConfig
 }
 
-func NewGithubIssueNotification(config *config.Config) *GithubIssueNotification {
+func NewGithubIssueNotification(config *config.DriftiveConfig) *GithubIssueNotification {
 	return &GithubIssueNotification{config: config}
 }
 

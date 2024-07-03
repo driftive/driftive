@@ -1,10 +1,10 @@
 package drift
 
 import (
+	"driftive/pkg/config"
 	"driftive/pkg/exec"
+	"driftive/pkg/utils"
 	"github.com/rs/zerolog/log"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -40,7 +40,7 @@ func NewDriftDetector(repoDir string, concurrency int) DriftDetector {
 		Concurrency: concurrency,
 		workerWg:    sync.WaitGroup{},
 		results:     nil,
-		semaphore:   make(chan struct{}, concurrency),
+		semaphore:   make(chan struct{}, utils.Max(1, concurrency)),
 	}
 }
 
@@ -62,7 +62,7 @@ func (d *DriftDetector) detectDriftConcurrently(dir string, projectDir string) {
 func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", d.RepoDir, d.Concurrency)
 
-	d.projectDirs = d.DetectTerragruntProjects(d.RepoDir)
+	d.projectDirs = config.DetectTerragruntProjects(d.RepoDir)
 	log.Info().Msgf("Detected %d projects", len(d.projectDirs))
 	d.totalProjects = len(d.projectDirs)
 	d.results = make(chan DriftProjectResult, d.totalProjects)
@@ -129,32 +129,4 @@ func (d *DriftDetector) isDriftDetected(commandOutput string) bool {
 		}
 	}
 	return true
-}
-
-func (d *DriftDetector) isPartOfCacheFolder(dir string) bool {
-	return strings.Contains(dir, ".terragrunt-cache")
-}
-
-// DetectTerragruntProjects detects all terragrunt projects recursively in a directory
-func (d *DriftDetector) DetectTerragruntProjects(dir string) []string {
-	targetFileName := "terragrunt.hcl"
-	var foldersContainingFile []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		// Check if the file is a terragrunt file. Ignore root terragrunt files.
-		if !info.IsDir() && info.Name() == targetFileName && path != filepath.Join(dir, targetFileName) && !d.isPartOfCacheFolder(path) {
-			folder := filepath.Dir(path)
-			foldersContainingFile = append(foldersContainingFile, folder)
-		}
-		return nil
-	})
-
-	if err != nil {
-		log.Info().Msgf("Error walking the path %v: %v\n", dir, err)
-		return nil
-	}
-
-	return foldersContainingFile
 }

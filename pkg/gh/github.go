@@ -3,6 +3,7 @@ package gh
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"os"
 )
 
@@ -38,5 +39,6 @@ func ParseGHActionContextEnvVar() (*GithubActionContext, error) {
 	if ghContext == "" {
 		return nil, fmt.Errorf("GITHUB_CONTEXT is not defined")
 	}
+	log.Debug().Msg("GITHUB_CONTEXT is defined. Parsing...")
 	return ParseGithubActionContext(ghContext)
 }
