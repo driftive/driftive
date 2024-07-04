@@ -2,9 +2,12 @@ package config
 
 import (
 	"driftive/pkg/config/repo"
+	"fmt"
 	"gopkg.in/yaml.v2"
 	"os"
 )
+
+var ErrMissingRepoConfig = fmt.Errorf(".driftive.yml not found")
 
 func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 	if os.Getenv("DRIFTIVE_REPO_CONFIG") != "" {
@@ -28,7 +31,7 @@ func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 		}
 		return cfg, nil
 	}
-	return nil, nil
+	return nil, ErrMissingRepoConfig
 }
 
 func DefaultRepoConfig() *repo.DriftiveRepoConfig {

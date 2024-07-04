@@ -7,6 +7,7 @@ import (
 	"driftive/pkg/git"
 	"driftive/pkg/models"
 	"driftive/pkg/notification"
+	"errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
@@ -47,7 +48,7 @@ func main() {
 	}
 
 	repoConfig, err := config.DetectRepoConfig(repoDir)
-	if err != nil {
+	if err != nil && !errors.Is(err, config.ErrMissingRepoConfig) {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
 
