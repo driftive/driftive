@@ -1,14 +1,15 @@
 package config
 
 import (
+	"driftive/pkg/config/repo"
 	"gopkg.in/yaml.v2"
 	"os"
 )
 
-func DetectRepoConfig(repoDir string) (*DriftiveRepoConfig, error) {
+func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 	if os.Getenv("DRIFTIVE_REPO_CONFIG") != "" {
 		envConfigStr := os.Getenv("DRIFTIVE_REPO_CONFIG")
-		cfg := &DriftiveRepoConfig{}
+		cfg := &repo.DriftiveRepoConfig{}
 		err := yaml.Unmarshal([]byte(envConfigStr), cfg)
 		if err != nil {
 			return nil, err
@@ -20,7 +21,7 @@ func DetectRepoConfig(repoDir string) (*DriftiveRepoConfig, error) {
 		if err != nil {
 			return nil, err
 		}
-		cfg := &DriftiveRepoConfig{}
+		cfg := &repo.DriftiveRepoConfig{}
 		err = yaml.Unmarshal(fileContent, cfg)
 		if err != nil {
 			return nil, err
@@ -30,12 +31,12 @@ func DetectRepoConfig(repoDir string) (*DriftiveRepoConfig, error) {
 	return nil, nil
 }
 
-func DefaultRepoConfig() *DriftiveRepoConfig {
-	return &DriftiveRepoConfig{
-		AutoDiscover: DriftiveRepoConfigAutoDiscover{
+func DefaultRepoConfig() *repo.DriftiveRepoConfig {
+	return &repo.DriftiveRepoConfig{
+		AutoDiscover: repo.DriftiveRepoConfigAutoDiscover{
 			Inclusions: []string{"**/terragrunt.hcl", "**/*.tf"},
 			Exclusions: []string{".git/**", "**/modules/**", "**/.terragrunt-cache/**", "**/.terraform", "/terragrunt.hcl"},
-			ProjectRules: []AutoDiscoverRule{{
+			ProjectRules: []repo.AutoDiscoverRule{{
 				Pattern:    "terragrunt.hcl",
 				Executable: "terragrunt"}},
 		},

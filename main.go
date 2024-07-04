@@ -2,8 +2,10 @@ package main
 
 import (
 	"driftive/pkg/config"
+	"driftive/pkg/config/discover"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
+	"driftive/pkg/models"
 	"driftive/pkg/notification"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -49,13 +51,13 @@ func main() {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
 
-	var projects []config.Project
+	var projects []models.Project
 	if repoConfig != nil {
 		log.Info().Msg("Repository config detected")
-		projects = config.AutoDiscoverProjects(repoDir, repoConfig)
+		projects = discover.AutoDiscoverProjects(repoDir, repoConfig)
 	} else {
 		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
-		projects = config.AutoDiscoverProjects(repoDir, config.DefaultRepoConfig())
+		projects = discover.AutoDiscoverProjects(repoDir, config.DefaultRepoConfig())
 	}
 	log.Info().Msgf("Projects detected: %d", len(projects))
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)

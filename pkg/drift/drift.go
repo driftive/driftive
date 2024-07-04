@@ -1,8 +1,8 @@
 package drift
 
 import (
-	"driftive/pkg/config"
 	"driftive/pkg/exec"
+	"driftive/pkg/models"
 	"driftive/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"strings"
@@ -12,7 +12,7 @@ import (
 
 type DriftDetector struct {
 	RepoDir     string
-	Projects    []config.Project
+	Projects    []models.Project
 	Concurrency int
 	workerWg    sync.WaitGroup
 	results     chan DriftProjectResult
@@ -33,7 +33,7 @@ type DriftDetectionResult struct {
 	Duration        time.Duration
 }
 
-func NewDriftDetector(repoDir string, projects []config.Project, concurrency int) DriftDetector {
+func NewDriftDetector(repoDir string, projects []models.Project, concurrency int) DriftDetector {
 	return DriftDetector{
 		RepoDir:     repoDir,
 		Projects:    projects,
@@ -44,14 +44,14 @@ func NewDriftDetector(repoDir string, projects []config.Project, concurrency int
 	}
 }
 
-func (d *DriftDetector) detectDriftConcurrently(dir string, projectDir string) {
+func (d *DriftDetector) detectDriftConcurrently(project models.Project, projectDir string) {
 	defer func() {
 		<-d.semaphore
 	}()
 	defer d.workerWg.Done()
-	result, err := d.detectDrift(dir)
+	result, err := d.detectDrift(project)
 	if err != nil {
-		log.Info().Msgf("Error checking drift in %s: %v", dir, err)
+		log.Info().Msgf("Error checking drift in %s: %v", project.Dir, err)
 	}
 	if result {
 		log.Info().Msgf("Drift detected in project %s", projectDir)
@@ -76,7 +76,7 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 		log.Info().Msgf("Checking drift in project %d/%d: %s", idx+1, len(d.Projects), projectDir)
 		d.workerWg.Add(1)
 		d.semaphore <- struct{}{}
-		go d.detectDriftConcurrently(proj.Dir, projectDir)
+		go d.detectDriftConcurrently(proj, projectDir)
 	}
 
 	d.workerWg.Wait()
@@ -99,16 +99,17 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	return result
 }
 
-func (d *DriftDetector) detectDrift(dir string) (bool, error) {
-	result, err := exec.RunCommandInDir(dir, "terragrunt", "init", "-upgrade", "-lock=false")
+func (d *DriftDetector) detectDrift(project models.Project) (bool, error) {
+	executor := exec.NewExecutor(project.Dir, project.Type)
+	result, err := executor.Init("-upgrade", "-lock=false")
 	if err != nil {
-		log.Info().Msgf("Error running init command in %s: %v", dir, err)
+		log.Info().Msgf("Error running init command in %s: %v", project.Dir, err)
 		log.Info().Msg(result)
 		return false, err
 	}
-	result, err = exec.RunCommandInDir(dir, "terragrunt", "plan", "-lock=false")
+	result, err = executor.Plan("-lock=false")
 	if err != nil {
-		log.Info().Msgf("Error running plan command in %s: %v", dir, err)
+		log.Info().Msgf("Error running plan command in %s: %v", project.Dir, err)
 		log.Info().Msg(result)
 		return false, err
 	}

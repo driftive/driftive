@@ -1,6 +1,8 @@
-package config
+package discover
 
 import (
+	"driftive/pkg/config/repo"
+	"driftive/pkg/models"
 	"driftive/pkg/utils"
 	"github.com/moby/patternmatcher"
 	"github.com/rs/zerolog/log"
@@ -10,17 +12,17 @@ import (
 	"strings"
 )
 
-func executableToProjectType(executable string) ProjectType {
+func executableToProjectType(executable string) models.ProjectType {
 	switch executable {
 	case "terraform":
-		return Terraform
+		return models.Terraform
 	case "tofu":
-		return Tofu
+		return models.Tofu
 	case "terragrunt":
-		return Terragrunt
+		return models.Terragrunt
 	default:
 		log.Warn().Msgf("Unknown executable type %v", executable)
-		return Terraform
+		return models.Terraform
 	}
 }
 
@@ -52,9 +54,9 @@ func isPartOfCacheFolder(dir string) bool {
 	return strings.Contains(dir, ".terragrunt-cache") || strings.Contains(dir, ".terraform")
 }
 
-func AutoDiscoverProjects(rootDir string, config *DriftiveRepoConfig) []Project {
+func AutoDiscoverProjects(rootDir string, config *repo.DriftiveRepoConfig) []models.Project {
 	projs := getAllPossibleProjectPaths(rootDir, config)
-	mapProjects := make(map[string]*Project)
+	mapProjects := make(map[string]*models.Project)
 	rules := config.AutoDiscover.ProjectRules
 
 	for _, proj := range projs {
@@ -78,7 +80,7 @@ func AutoDiscoverProjects(rootDir string, config *DriftiveRepoConfig) []Project 
 				}
 				if match {
 					projectType := executableToProjectType(rule.Executable)
-					project := &Project{
+					project := &models.Project{
 						Dir:  proj,
 						Type: projectType,
 					}
@@ -98,7 +100,7 @@ func AutoDiscoverProjects(rootDir string, config *DriftiveRepoConfig) []Project 
 		}
 	}
 
-	driftiveProjects := make([]Project, 0, len(mapProjects))
+	driftiveProjects := make([]models.Project, 0, len(mapProjects))
 	for _, project := range mapProjects {
 		driftiveProjects = append(driftiveProjects, *project)
 	}
@@ -157,7 +159,7 @@ func getAllFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-func getAllPossibleProjectPaths(root string, config *DriftiveRepoConfig) []string {
+func getAllPossibleProjectPaths(root string, config *repo.DriftiveRepoConfig) []string {
 	allFiles, err := getAllFiles(root)
 	if err != nil {
 		log.Error().Msgf("Error getting all files in %v: %v", root, err)
