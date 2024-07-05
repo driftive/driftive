@@ -128,7 +128,6 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 }
 
 func (g *GithubIssueNotification) DeleteIssueIfExists(client *github.Client, issues []*github.Issue, project drift.DriftProjectResult) {
-
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
