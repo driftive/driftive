@@ -78,6 +78,22 @@ auto_discover:
       executable: "terraform"
 ```
 
+### Github issues
+Driftive supports creating GitHub issues for detected drifts. To enable this feature, you need to provide a GitHub token using the `--github-token` and `--github-issues=true` options and have the GITHUB_CONTEXT environment variable set.
+In Github actions, you can set the GITHUB_CONTEXT like this:
+```yaml
+jobs:
+  driftive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run driftive
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: driftive --repo-path=. --github-token=${{ secrets.GITHUB_TOKEN }} --github-issues=true
+```
+
+![GitHub issue](/assets/gh_issues.png "GitHub issue")
+
 ### Slack notifications
 
 Driftive supports sending notifications to Slack. To enable this feature, you need to provide a Slack webhook URL.
