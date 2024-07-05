@@ -30,24 +30,57 @@ $ driftive --repo-path /path/to/terragrunt/projects --slack-url https://hooks.sl
 
 Docker usage:
 ```bash
-docker pull driftive/driftive:0.2.0
-docker run driftive/driftive:0.2.0 --help
+docker pull driftive/driftive:x.y.z
+docker run driftive/driftive:x.y.z --help
 ```
 
-### Output example
+### Configuration
+#### CLI options
+* `--repo-path` - path to the repository directory containing projects (takes precedence over `--repo-url`)
+* `--slack-url` - Slack webhook URL for notifications
+* `--concurrency` - number of concurrent projects to analyze (default: 4)
+* `--log-level` - log level. Available options: `debug`, `info`, `warn`, `error` (default: `info`)
+* `--stdout` - log state drifts to stdout (default: `true`)
+* `--github-token` - GitHub token for accessing private repositories
+* `--github-issues` - create GitHub issues for detected drifts
+* `--repo-url` - URL of the repository containing the projects
 
-A message will be sent in the Slack channel if any state drift is detected.
-Example:
+#### Repository configuration
+Driftive uses a configuration file named `driftive.yml` to define the projects to analyze. 
+The configuration file should be placed in the root directory of the repository.
+With the configuration file, you can define the projects to analyze, the executables to use, 
+and the paths to include/exclude.
 
-````
-:bangbang: State Drift detected in Terragrunt projects
-:gear: Drifts 2/14
-:clock1: Analysis duration 1m.30s
-:point_down: Projects with state drifts
+The `project_rules` section defines the executables to use for the files matching the pattern.
+`project_rules` are evaluated in the order they are defined. 
+If a file matches multiple patterns, the first matching rule is used.
+
+Example configuration:
+```yaml
+auto_discover:
+  enabled: true
+  inclusions:
+    - '**/*.tf'
+    - '**/terragrunt.hcl'
+
+  exclusions:
+    - '**/modules/**'
+    - '**/.terragrunt-cache/**'
+    - '**/.terraform/**'
+    - '/terragrunt.hcl' # exclude root terragrunt.hcl
+
+  project_rules:
+    - pattern: 'terragrunt.hcl'
+      executable: 'terragrunt'
+
+    - pattern: "*.tf"
+      executable: "terraform"
 ```
-my/project1
-my/project2
-```
-````
+
+### Slack notifications
+
+Driftive supports sending notifications to Slack. To enable this feature, you need to provide a Slack webhook URL.
+![Slack notification](/assets/slack_notification.png "Slack notification")
+
 
 
