@@ -4,12 +4,13 @@
 
 # Driftive
 
-Driftive is a simple tool for detecting drift in Terragrunt/Terraform projects.
-Currently, it supports only Terragrunt projects.
+Driftive is a tool for detecting drift in Terragrunt/Terraform/OpenTofu projects.
 
 ## Features
-* Concurrently analyze multiple projects
-* Notifies about drifts in Slack
+* Concurrently analyze multiple projects in a repository
+* Slack notifications
+* Creates GitHub issues for detected drifts
+* Supports Terraform, Terragrunt, and OpenTofu projects
 
 ## Installation
 
