@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/google/go-github/v62/github"
 	"github.com/rs/zerolog/log"
+	"strings"
 )
 
 const (
@@ -28,12 +29,18 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 	issueTitle := fmt.Sprintf(issueTitleFormat, project.Project)
 	issueBody := fmt.Sprintf(issueBodyFormat, project.Project)
 
+	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
+	if len(ownerRepo) != 2 {
+		log.Error().Msg("Invalid repository name")
+		return
+	}
+
 	for _, issue := range openIssues {
 		if issue.GetTitle() == issueTitle && issue.GetBody() == issueBody {
 			log.Info().Msgf("Issue already exists for project %s (repo: %s/%s)",
 				project.Project,
-				g.config.GithubContext.RepositoryOwner,
-				g.config.GithubContext.Repository)
+				ownerRepo[0],
+				ownerRepo[1])
 			return
 		}
 	}
@@ -45,13 +52,13 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 
 	log.Info().Msgf("Closing issue for project %s (repo: %s/%s)",
 		project.Project,
-		g.config.GithubContext.RepositoryOwner,
-		g.config.GithubContext.Repository)
+		ownerRepo[0],
+		ownerRepo[1])
 
 	_, _, err := client.Issues.Create(
 		ctx,
-		g.config.GithubContext.RepositoryOwner,
-		g.config.GithubContext.Repository,
+		ownerRepo[0],
+		ownerRepo[1],
 		issue)
 
 	if err != nil {
@@ -70,11 +77,17 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 	var issues []*github.Issue
 	var err error
 
+	// Split owner/repository_name
+	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
+	if len(ownerRepo) != 2 {
+		return nil, fmt.Errorf("invalid repository name")
+	}
+
 	for {
 		issues, _, err = client.Issues.ListByRepo(
 			ctx,
-			g.config.GithubContext.RepositoryOwner,
-			g.config.GithubContext.Repository,
+			ownerRepo[0],
+			ownerRepo[1],
 			opt)
 
 		if err != nil {
@@ -108,26 +121,32 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 	for _, project := range driftResult.DriftedProjects {
 		if project.Drifted {
 			g.CreateOrUpdateIssue(ghClient, openIssues, project)
-		} else if project.Succeeded {
-			g.DeleteIssueIfExist(ghClient, openIssues, project)
+		} else if !project.Drifted && project.Succeeded {
+			g.DeleteIssueIfExists(ghClient, openIssues, project)
 		}
 	}
 }
 
-func (g *GithubIssueNotification) DeleteIssueIfExist(client *github.Client, issues []*github.Issue, project drift.DriftProjectResult) {
+func (g *GithubIssueNotification) DeleteIssueIfExists(client *github.Client, issues []*github.Issue, project drift.DriftProjectResult) {
+	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
+	if len(ownerRepo) != 2 {
+		log.Error().Msg("Invalid repository name")
+		return
+	}
+
 	for _, issue := range issues {
 		if issue.GetTitle() == fmt.Sprintf(issueTitleFormat, project.Project) {
 			ctx := context.Background()
 
 			log.Info().Msgf("Closing issue for project %s (repo: %s/%s)",
 				project.Project,
-				g.config.GithubContext.RepositoryOwner,
-				g.config.GithubContext.Repository)
+				ownerRepo[0],
+				ownerRepo[1])
 
 			_, _, err := client.Issues.Edit(
 				ctx,
-				g.config.GithubContext.RepositoryOwner,
-				g.config.GithubContext.Repository,
+				ownerRepo[0],
+				ownerRepo[1],
 				issue.GetNumber(),
 				&github.IssueRequest{
 					State: github.String("closed"),
