@@ -2,10 +2,12 @@ package main
 
 import (
 	"driftive/pkg/config"
+	"driftive/pkg/config/discover"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
+	"driftive/pkg/models"
 	"driftive/pkg/notification"
-	"driftive/pkg/utils"
+	"errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
@@ -35,18 +37,31 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
-
 	cfg := config.ParseConfig()
 
-	zerolog.SetGlobalLevel(utils.ParseLogLevel(cfg.LogLevel))
+	showInitMessage(cfg)
 
 	repoDir, shouldDelete := determineRepositoryDir(cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
 	if shouldDelete {
-		log.Debug().Msg("Temp dir will be deleted after the program finishes")
+		log.Debug().Msg("Temp dir will be deleted after driftive finishes.")
 		defer os.RemoveAll(repoDir)
 	}
 
-	driftDetector := drift.NewDriftDetector(repoDir, cfg.Concurrency)
+	repoConfig, err := config.DetectRepoConfig(repoDir)
+	if err != nil && !errors.Is(err, config.ErrMissingRepoConfig) {
+		log.Fatal().Msgf("Failed to load repository config. %v", err)
+	}
+
+	var projects []models.Project
+	if repoConfig != nil {
+		log.Info().Msg("Repository config detected")
+		projects = discover.AutoDiscoverProjects(repoDir, repoConfig)
+	} else {
+		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
+		projects = discover.AutoDiscoverProjects(repoDir, config.DefaultRepoConfig())
+	}
+	log.Info().Msgf("Projects detected: %d", len(projects))
+	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
 
 	if analysisResult.TotalDrifted > 0 {
@@ -78,5 +93,26 @@ func main() {
 
 	if analysisResult.TotalDrifted > 0 {
 		os.Exit(1)
+	}
+}
+
+func parseOnOff(enabled bool) string {
+	if enabled {
+		return "on"
+	}
+	return "off"
+}
+
+func showInitMessage(cfg config.DriftiveConfig) {
+	log.Info().Msg("Starting driftive...")
+	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s",
+		cfg.Concurrency,
+		parseOnOff(cfg.EnableGithubIssues),
+		parseOnOff(cfg.SlackWebhookUrl != ""))
+
+	if cfg.EnableGithubIssues && (cfg.GithubToken == "" || cfg.GithubContext == nil || cfg.GithubContext.Repository == "" || cfg.GithubContext.RepositoryOwner == "") {
+		log.Fatal().Msg("Github issues are enabled but the required Github token or context is not provided. " +
+			"Use the --github-token flag or set the GITHUB_TOKEN environment variable. " +
+			"Also, ensure that the GITHUB_CONTEXT environment variable is set in Github Actions.")
 	}
 }

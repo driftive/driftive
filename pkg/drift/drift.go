@@ -2,22 +2,21 @@ package drift
 
 import (
 	"driftive/pkg/exec"
+	"driftive/pkg/models"
+	"driftive/pkg/utils"
 	"github.com/rs/zerolog/log"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 )
 
 type DriftDetector struct {
-	RepoDir       string
-	Concurrency   int
-	workerWg      sync.WaitGroup
-	results       chan DriftProjectResult
-	totalProjects int
-	projectDirs   []string
-	semaphore     chan struct{}
+	RepoDir     string
+	Projects    []models.Project
+	Concurrency int
+	workerWg    sync.WaitGroup
+	results     chan DriftProjectResult
+	semaphore   chan struct{}
 }
 
 type DriftProjectResult struct {
@@ -34,24 +33,25 @@ type DriftDetectionResult struct {
 	Duration        time.Duration
 }
 
-func NewDriftDetector(repoDir string, concurrency int) DriftDetector {
+func NewDriftDetector(repoDir string, projects []models.Project, concurrency int) DriftDetector {
 	return DriftDetector{
 		RepoDir:     repoDir,
+		Projects:    projects,
 		Concurrency: concurrency,
 		workerWg:    sync.WaitGroup{},
 		results:     nil,
-		semaphore:   make(chan struct{}, concurrency),
+		semaphore:   make(chan struct{}, utils.Max(1, concurrency)),
 	}
 }
 
-func (d *DriftDetector) detectDriftConcurrently(dir string, projectDir string) {
+func (d *DriftDetector) detectDriftConcurrently(project models.Project, projectDir string) {
 	defer func() {
 		<-d.semaphore
 	}()
 	defer d.workerWg.Done()
-	result, err := d.detectDrift(dir)
+	result, err := d.detectDrift(project)
 	if err != nil {
-		log.Info().Msgf("Error checking drift in %s: %v", dir, err)
+		log.Info().Msgf("Error checking drift in %s: %v", project.Dir, err)
 	}
 	if result {
 		log.Info().Msgf("Drift detected in project %s", projectDir)
@@ -61,28 +61,22 @@ func (d *DriftDetector) detectDriftConcurrently(dir string, projectDir string) {
 
 func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", d.RepoDir, d.Concurrency)
-
-	d.projectDirs = d.DetectTerragruntProjects(d.RepoDir)
-	log.Info().Msgf("Detected %d projects", len(d.projectDirs))
-	d.totalProjects = len(d.projectDirs)
-	d.results = make(chan DriftProjectResult, d.totalProjects)
-
+	d.results = make(chan DriftProjectResult, len(d.Projects))
 	var totalChecked = 0
-
 	startTime := time.Now()
 
-	for idx, dir := range d.projectDirs {
-		projectDir := strings.TrimPrefix(strings.Replace(dir, d.RepoDir, "", -1), "/")
+	for idx, proj := range d.Projects {
+		projectDir := strings.TrimPrefix(strings.Replace(proj.Dir, d.RepoDir, "", -1), utils.PathSeparator)
 
 		if projectDir == "" {
 			continue
 		}
 
 		totalChecked++
-		log.Info().Msgf("Checking drift in project %d/%d: %s", idx+1, d.totalProjects, projectDir)
+		log.Info().Msgf("Checking drift in project %d/%d: %s", idx+1, len(d.Projects), projectDir)
 		d.workerWg.Add(1)
 		d.semaphore <- struct{}{}
-		go d.detectDriftConcurrently(dir, projectDir)
+		go d.detectDriftConcurrently(proj, projectDir)
 	}
 
 	d.workerWg.Wait()
@@ -98,23 +92,24 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	result := DriftDetectionResult{
 		DriftedProjects: driftedProjects,
 		TotalDrifted:    len(driftedProjects),
-		TotalProjects:   d.totalProjects,
-		TotalChecked:    d.totalProjects,
+		TotalProjects:   len(d.Projects),
+		TotalChecked:    len(d.Projects),
 		Duration:        time.Since(startTime),
 	}
 	return result
 }
 
-func (d *DriftDetector) detectDrift(dir string) (bool, error) {
-	result, err := exec.RunCommandInDir(dir, "terragrunt", "init", "-upgrade", "-lock=false")
+func (d *DriftDetector) detectDrift(project models.Project) (bool, error) {
+	executor := exec.NewExecutor(project.Dir, project.Type)
+	result, err := executor.Init("-upgrade", "-lock=false")
 	if err != nil {
-		log.Info().Msgf("Error running init command in %s: %v", dir, err)
+		log.Info().Msgf("Error running init command in %s: %v", project.Dir, err)
 		log.Info().Msg(result)
 		return false, err
 	}
-	result, err = exec.RunCommandInDir(dir, "terragrunt", "plan", "-lock=false")
+	result, err = executor.Plan("-lock=false")
 	if err != nil {
-		log.Info().Msgf("Error running plan command in %s: %v", dir, err)
+		log.Info().Msgf("Error running plan command in %s: %v", project.Dir, err)
 		log.Info().Msg(result)
 		return false, err
 	}
@@ -129,32 +124,4 @@ func (d *DriftDetector) isDriftDetected(commandOutput string) bool {
 		}
 	}
 	return true
-}
-
-func (d *DriftDetector) isPartOfCacheFolder(dir string) bool {
-	return strings.Contains(dir, ".terragrunt-cache")
-}
-
-// DetectTerragruntProjects detects all terragrunt projects recursively in a directory
-func (d *DriftDetector) DetectTerragruntProjects(dir string) []string {
-	targetFileName := "terragrunt.hcl"
-	var foldersContainingFile []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		// Check if the file is a terragrunt file. Ignore root terragrunt files.
-		if !info.IsDir() && info.Name() == targetFileName && path != filepath.Join(dir, targetFileName) && !d.isPartOfCacheFolder(path) {
-			folder := filepath.Dir(path)
-			foldersContainingFile = append(foldersContainingFile, folder)
-		}
-		return nil
-	})
-
-	if err != nil {
-		log.Info().Msgf("Error walking the path %v: %v\n", dir, err)
-		return nil
-	}
-
-	return foldersContainingFile
 }

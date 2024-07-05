@@ -1,0 +1,18 @@
+auto_discover:
+  enabled: true
+  inclusions:
+    - '**/*.tf'
+    - '**/terragrunt.hcl'
+
+  exclusions:
+    - '**/modules/**'
+    - '**/.terragrunt-cache/**'
+    - '**/.terraform/**'
+    - '/terragrunt.hcl'
+
+  project_rules:
+    - pattern: 'terragrunt.hcl'
+      executable: 'terragrunt'
+
+    - pattern: "*.tf"
+      executable: "terraform"

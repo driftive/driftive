@@ -2,24 +2,12 @@ package config
 
 import (
 	"driftive/pkg/gh"
+	"driftive/pkg/utils"
 	"flag"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"strings"
 )
-
-type Config struct {
-	RepositoryUrl  string `json:"repository_url" yaml:"repository_url"`
-	Branch         string `json:"branch" yaml:"branch"`
-	RepositoryPath string `json:"repository_path" yaml:"repository_path"`
-	Concurrency    int    `json:"concurrency" yaml:"concurrency"`
-
-	LogLevel string `json:"log_level" yaml:"log_level"`
-
-	EnableStdoutResult bool   `json:"stdout_result" yaml:"stdout_result"`
-	EnableGithubIssues bool   `json:"github_issues" yaml:"github_issues"`
-	SlackWebhookUrl    string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
-	GithubToken        string `json:"github_token" yaml:"github_token"`
-	GithubContext      *gh.GithubActionContext
-}
 
 func validateArgs(repositoryUrl, repositoryPath, branch string) {
 	if repositoryUrl == "" && repositoryPath == "" {
@@ -30,7 +18,7 @@ func validateArgs(repositoryUrl, repositoryPath, branch string) {
 	}
 }
 
-func ParseConfig() Config {
+func ParseConfig() DriftiveConfig {
 	var repositoryUrl string
 	var slackWebhookUrl string
 	var branch string
@@ -49,10 +37,12 @@ func ParseConfig() Config {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level. Options: trace, debug, info, warn, error, fatal, panic")
 	flag.BoolVar(&enableStdoutResult, "stdout", true, "Enable printing drift results to stdout")
 	flag.StringVar(&githubToken, "github-token", "", "Github token")
-	flag.BoolVar(&enableGithubIssues, "github-issues", true, "Enable creating Github issues for drifts, if running in Github Actions.")
+	flag.BoolVar(&enableGithubIssues, "github-issues", false, "Enable creating Github issues for drifts, if running in Github Actions.")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, branch)
+
+	zerolog.SetGlobalLevel(utils.ParseLogLevel(logLevel))
 
 	ghContext, err := gh.ParseGHActionContextEnvVar()
 
@@ -60,10 +50,10 @@ func ParseConfig() Config {
 		log.Warn().Msgf("Failed to parse github action context. %v", err)
 	}
 
-	return Config{
+	return DriftiveConfig{
 		RepositoryUrl:      repositoryUrl,
 		Branch:             branch,
-		RepositoryPath:     repositoryPath,
+		RepositoryPath:     strings.TrimSuffix(repositoryPath, utils.PathSeparator),
 		Concurrency:        concurrency,
 		LogLevel:           logLevel,
 		EnableStdoutResult: enableStdoutResult,
