@@ -66,7 +66,7 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	startTime := time.Now()
 
 	for idx, proj := range d.Projects {
-		projectDir := strings.TrimPrefix(strings.Replace(proj.Dir, d.RepoDir, "", -1), "/")
+		projectDir := strings.TrimPrefix(strings.Replace(proj.Dir, d.RepoDir, "", -1), utils.PathSeparator)
 
 		if projectDir == "" {
 			continue

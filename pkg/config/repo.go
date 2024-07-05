@@ -2,12 +2,28 @@ package config
 
 import (
 	"driftive/pkg/config/repo"
+	"driftive/pkg/utils"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
 	"os"
 )
 
-var ErrMissingRepoConfig = fmt.Errorf(".driftive.yml not found")
+var ErrMissingRepoConfig = fmt.Errorf("driftive.yml not found")
+
+func loadRepoConfig(filePath string) (*repo.DriftiveRepoConfig, error) {
+	log.Info().Msgf("Loading repo config from %s", filePath)
+	fileContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	cfg := &repo.DriftiveRepoConfig{}
+	err = yaml.Unmarshal(fileContent, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
 
 func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 	if os.Getenv("DRIFTIVE_REPO_CONFIG") != "" {
@@ -19,17 +35,11 @@ func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 		}
 	}
 
-	if _, err := os.Stat(repoDir + "/.driftive.yml"); err == nil {
-		fileContent, err := os.ReadFile(repoDir + "/.driftive.yml")
-		if err != nil {
-			return nil, err
-		}
-		cfg := &repo.DriftiveRepoConfig{}
-		err = yaml.Unmarshal(fileContent, cfg)
-		if err != nil {
-			return nil, err
-		}
-		return cfg, nil
+	if _, err := os.Stat(repoDir + utils.PathSeparator + "driftive.yml"); err == nil {
+		return loadRepoConfig(repoDir + utils.PathSeparator + "driftive.yml")
+	}
+	if _, err := os.Stat(repoDir + utils.PathSeparator + "driftive.yaml"); err == nil {
+		return loadRepoConfig(repoDir + utils.PathSeparator + "driftive.yaml")
 	}
 	return nil, ErrMissingRepoConfig
 }

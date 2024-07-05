@@ -6,6 +6,7 @@ import (
 	"flag"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"strings"
 )
 
 func validateArgs(repositoryUrl, repositoryPath, branch string) {
@@ -52,7 +53,7 @@ func ParseConfig() DriftiveConfig {
 	return DriftiveConfig{
 		RepositoryUrl:      repositoryUrl,
 		Branch:             branch,
-		RepositoryPath:     repositoryPath,
+		RepositoryPath:     strings.TrimSuffix(repositoryPath, utils.PathSeparator),
 		Concurrency:        concurrency,
 		LogLevel:           logLevel,
 		EnableStdoutResult: enableStdoutResult,
