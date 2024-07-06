@@ -82,7 +82,7 @@ func main() {
 			}
 		}
 
-		if cfg.GithubToken != "" && cfg.GithubContext != nil {
+		if cfg.EnableGithubIssues && cfg.GithubToken != "" && cfg.GithubContext != nil {
 			log.Info().Msg("Sending notification to github...")
 			gh := notification.NewGithubIssueNotification(&cfg)
 			gh.Send(analysisResult)
