@@ -45,6 +45,7 @@ docker run driftive/driftive:x.y.z --help
 * `--github-token` - GitHub token for accessing private repositories
 * `--github-issues` - create GitHub issues for detected drifts
 * `--repo-url` - URL of the repository containing the projects
+* `--branch` - branch to analyze (default: `main`). Required in case of `--repo-url`
 
 #### Repository configuration
 Driftive uses a configuration file named `driftive.yml` to define the projects to analyze. 
