@@ -26,7 +26,7 @@ $ brew install driftive/tap/driftive
 CLI usage:
 ```bash 
 $ driftive --help
-$ driftive --repo-path /path/to/terragrunt/projects --slack-url https://hooks.slack.com/services/XXXXX/XXXXX/XXXXX
+$ driftive --repo-path /path/to/projects/repo --slack-url https://hooks.slack.com/services/XXXXX/XXXXX/XXXXX
 ```
 
 Docker usage:
