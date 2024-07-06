@@ -50,7 +50,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 		Body:  &issueBody,
 	}
 
-	log.Info().Msgf("Closing issue for project %s (repo: %s/%s)",
+	log.Info().Msgf("Creating issue for project %s (repo: %s/%s)",
 		project.Project,
 		ownerRepo[0],
 		ownerRepo[1])
