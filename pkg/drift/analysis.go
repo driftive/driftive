@@ -6,43 +6,8 @@ import (
 	"driftive/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"strings"
-	"sync"
 	"time"
 )
-
-type DriftDetector struct {
-	RepoDir     string
-	Projects    []models.Project
-	Concurrency int
-	workerWg    sync.WaitGroup
-	results     chan DriftProjectResult
-	semaphore   chan struct{}
-}
-
-type DriftProjectResult struct {
-	Project   string
-	Drifted   bool
-	Succeeded bool
-}
-
-type DriftDetectionResult struct {
-	DriftedProjects []DriftProjectResult
-	TotalDrifted    int
-	TotalProjects   int
-	TotalChecked    int
-	Duration        time.Duration
-}
-
-func NewDriftDetector(repoDir string, projects []models.Project, concurrency int) DriftDetector {
-	return DriftDetector{
-		RepoDir:     repoDir,
-		Projects:    projects,
-		Concurrency: concurrency,
-		workerWg:    sync.WaitGroup{},
-		results:     nil,
-		semaphore:   make(chan struct{}, utils.Max(1, concurrency)),
-	}
-}
 
 func (d *DriftDetector) detectDriftConcurrently(project models.Project, projectDir string) {
 	defer func() {
@@ -53,10 +18,10 @@ func (d *DriftDetector) detectDriftConcurrently(project models.Project, projectD
 	if err != nil {
 		log.Info().Msgf("Error checking drift in %s: %v", project.Dir, err)
 	}
-	if result {
+	if result.Drifted {
 		log.Info().Msgf("Drift detected in project %s", projectDir)
 	}
-	d.results <- DriftProjectResult{Project: projectDir, Drifted: result}
+	d.results <- result
 }
 
 func (d *DriftDetector) DetectDrift() DriftDetectionResult {
@@ -99,21 +64,27 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	return result
 }
 
-func (d *DriftDetector) detectDrift(project models.Project) (bool, error) {
+func (d *DriftDetector) detectDrift(project models.Project) (DriftProjectResult, error) {
 	executor := exec.NewExecutor(project.Dir, project.Type)
-	result, err := executor.Init("-upgrade", "-lock=false")
+	output, err := executor.Init("-upgrade", "-lock=false", "-no-color")
+
 	if err != nil {
 		log.Info().Msgf("Error running init command in %s: %v", project.Dir, err)
-		log.Info().Msg(result)
-		return false, err
+		log.Info().Msg(output)
+		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false, InitOutput: output, PlanOutput: ""}, err
 	}
-	result, err = executor.Plan("-lock=false")
+	output, err = executor.Plan("-lock=false", "-no-color")
 	if err != nil {
 		log.Info().Msgf("Error running plan command in %s: %v", project.Dir, err)
-		log.Info().Msg(result)
-		return false, err
+		log.Info().Msg(output)
+		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false, InitOutput: "", PlanOutput: output}, err
 	}
-	return d.isDriftDetected(result), nil
+	driftDetected := d.isDriftDetected(output)
+	if driftDetected {
+		output = executor.ParsePlan(output)
+	}
+	result := DriftProjectResult{Project: project, Drifted: driftDetected, Succeeded: true, InitOutput: "", PlanOutput: output}
+	return result, nil
 }
 
 func (d *DriftDetector) isDriftDetected(commandOutput string) bool {

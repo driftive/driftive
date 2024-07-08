@@ -49,9 +49,14 @@ func DefaultRepoConfig() *repo.DriftiveRepoConfig {
 		AutoDiscover: repo.DriftiveRepoConfigAutoDiscover{
 			Inclusions: []string{"**/terragrunt.hcl", "**/*.tf"},
 			Exclusions: []string{".git/**", "**/modules/**", "**/.terragrunt-cache/**", "**/.terraform", "/terragrunt.hcl"},
-			ProjectRules: []repo.AutoDiscoverRule{{
-				Pattern:    "terragrunt.hcl",
-				Executable: "terragrunt"}},
+			ProjectRules: []repo.AutoDiscoverRule{
+				{
+					Pattern:    "terragrunt.hcl",
+					Executable: "terragrunt"},
+				{
+					Pattern:    "*.tf",
+					Executable: "terraform",
+				}},
 		},
 	}
 }

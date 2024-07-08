@@ -15,3 +15,7 @@ func (t TofuExecutor) Init(args ...string) (string, error) {
 func (t TofuExecutor) Plan(args ...string) (string, error) {
 	return RunCommandInDir(t.Dir(), "tofu", append([]string{"plan"}, args...)...)
 }
+
+func (t TofuExecutor) ParsePlan(output string) string {
+	return parsePlan(output)
+}

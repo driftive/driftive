@@ -1,0 +1,11 @@
+Terraform will perform the following actions:
+
+  # null_resource.foo must be replaced
+-/+ resource "null_resource" "foo" {
+      ~ id       = "4654577444608769802" -> (known after apply)
+      ~ triggers = { # forces replacement
+          ~ "foo" = "bar" -> "bar2"
+        }
+    }
+
+Plan: 1 to add, 0 to change, 1 to destroy.

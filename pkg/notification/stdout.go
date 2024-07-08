@@ -22,7 +22,7 @@ func (stdout Stdout) Send(driftResult drift.DriftDetectionResult) error {
 	log.Info().Msgf("Drifts %d out of %d total projects", driftResult.TotalDrifted, driftResult.TotalProjects)
 	log.Info().Msgf("Projects with drift:")
 	for _, project := range driftResult.DriftedProjects {
-		log.Info().Msgf("Project: %s", project.Project)
+		log.Info().Msgf("Project: %s", project.Project.Dir)
 	}
 	log.Info().Msgf("============================================")
 	return nil

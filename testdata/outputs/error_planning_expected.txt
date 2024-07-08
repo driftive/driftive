@@ -1,0 +1,18 @@
+Planning failed. Terraform encountered an error while generating this plan.
+
+╷
+│ Error: 401 Unauthorized: Unauthorized
+│
+│   with module.mod.env.this,
+│   on ../modules/mod1/environment.tf line 1, in resource "env" "this":
+│    1: resource "env" "this" {
+│
+╵
+╷
+│ Error: 401 Unauthorized: Unauthorized
+│
+│   with module.mod.env.this,
+│   on ../modules/mod1/environment.tf line 1, in resource "env" "this":
+│    1: resource "env" "this" {
+│
+╵
