@@ -15,3 +15,7 @@ func (t TerragruntExecutor) Init(args ...string) (string, error) {
 func (t TerragruntExecutor) Plan(args ...string) (string, error) {
 	return RunCommandInDir(t.Dir(), "terragrunt", append([]string{"plan"}, args...)...)
 }
+
+func (t TerragruntExecutor) ParsePlan(output string) string {
+	return parsePlan(output)
+}

@@ -10,6 +10,7 @@ type Executor interface {
 	Dir() string
 	Init(args ...string) (string, error)
 	Plan(args ...string) (string, error)
+	ParsePlan(output string) string
 }
 
 func NewExecutor(dir string, t models.ProjectType) Executor {
