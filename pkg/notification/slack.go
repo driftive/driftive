@@ -23,7 +23,9 @@ func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 	message += fmt.Sprintf(":clock1: Analysis duration `%s`\n", driftResult.Duration.String())
 	message += ":point_down: Projects with state drifts \n\n```"
 	for _, project := range driftResult.DriftedProjects {
-		message += fmt.Sprintf("%s\n", project.Project.Dir)
+		if project.Drifted {
+			message += fmt.Sprintf("%s\n", project.Project.Dir)
+		}
 	}
 	message += "```"
 
