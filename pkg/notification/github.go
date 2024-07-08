@@ -1,18 +1,22 @@
 package notification
 
 import (
+	"bytes"
 	"context"
 	"driftive/pkg/config"
 	"driftive/pkg/drift"
+	"driftive/pkg/utils"
 	"fmt"
 	"github.com/google/go-github/v62/github"
 	"github.com/rs/zerolog/log"
+	"os"
 	"strings"
+	"text/template"
 )
 
 const (
 	issueTitleFormat = "drift detected: %s"
-	issueBodyFormat  = "Drift detected in project: %s"
+	maxIssueBodySize = 64000 // Lower than 65535 to account for other metadata
 )
 
 type GithubIssueNotification struct {
@@ -23,11 +27,46 @@ func NewGithubIssueNotification(config *config.DriftiveConfig) *GithubIssueNotif
 	return &GithubIssueNotification{config: config}
 }
 
+func parseGithubBodyTemplate(project drift.DriftProjectResult) (*string, error) {
+	templateArgs := struct {
+		ProjectDir string
+		Output     string
+	}{
+		ProjectDir: project.Project.Dir,
+		Output:     project.PlanOutput[0:utils.Min(len(project.PlanOutput), maxIssueBodySize)],
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get working directory")
+		return nil, err
+	}
+	tmpl, err := template.ParseFiles(wd + "/template/gh-issue-description.md")
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to parse github issue description template")
+		return nil, err
+	}
+	buff := new(bytes.Buffer)
+	err = tmpl.Execute(buff, templateArgs)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to execute github issue description template")
+		return nil, err
+	}
+	resultStr := buff.String()
+	return &resultStr, nil
+}
+
 func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, openIssues []*github.Issue, project drift.DriftProjectResult) {
 	ctx := context.Background()
 
-	issueTitle := fmt.Sprintf(issueTitleFormat, project.Project)
-	issueBody := fmt.Sprintf(issueBodyFormat, project.Project)
+	issueTitle := fmt.Sprintf(issueTitleFormat, project.Project.Dir)
+
+	issueBody, err := parseGithubBodyTemplate(project)
+
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to parse github issue description template")
+		return
+	}
 
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
@@ -36,26 +75,49 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 	}
 
 	for _, issue := range openIssues {
-		if issue.GetTitle() == issueTitle && issue.GetBody() == issueBody {
-			log.Info().Msgf("Issue already exists for project %s (repo: %s/%s)",
-				project.Project,
-				ownerRepo[0],
-				ownerRepo[1])
-			return
+		if issue.GetTitle() == issueTitle {
+			if issue.GetBody() == *issueBody {
+				log.Info().Msgf("Issue already exists for project %s (repo: %s/%s)",
+					project.Project.Dir,
+					ownerRepo[0],
+					ownerRepo[1])
+				return
+			} else {
+				_, _, err := client.Issues.Edit(
+					ctx,
+					ownerRepo[0],
+					ownerRepo[1],
+					issue.GetNumber(),
+					&github.IssueRequest{
+						Body: issueBody,
+					})
+
+				if err != nil {
+					log.Error().Msgf("Failed to update issue. %v", err)
+					return
+				}
+
+				log.Info().Msgf("Updated issue for project %s (repo: %s/%s)",
+					project.Project.Dir,
+					ownerRepo[0],
+					ownerRepo[1])
+
+				return
+			}
 		}
 	}
 
 	issue := &github.IssueRequest{
 		Title: &issueTitle,
-		Body:  &issueBody,
+		Body:  issueBody,
 	}
 
 	log.Info().Msgf("Creating issue for project %s (repo: %s/%s)",
-		project.Project,
+		project.Project.Dir,
 		ownerRepo[0],
 		ownerRepo[1])
 
-	_, _, err := client.Issues.Create(
+	_, _, err = client.Issues.Create(
 		ctx,
 		ownerRepo[0],
 		ownerRepo[1],
@@ -135,11 +197,11 @@ func (g *GithubIssueNotification) DeleteIssueIfExists(client *github.Client, iss
 	}
 
 	for _, issue := range issues {
-		if issue.GetTitle() == fmt.Sprintf(issueTitleFormat, project.Project) {
+		if issue.GetTitle() == fmt.Sprintf(issueTitleFormat, project.Project.Dir) {
 			ctx := context.Background()
 
 			log.Info().Msgf("Closing issue for project %s (repo: %s/%s)",
-				project.Project,
+				project.Project.Dir,
 				ownerRepo[0],
 				ownerRepo[1])
 
