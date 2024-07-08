@@ -44,6 +44,7 @@ docker run driftive/driftive:x.y.z --help
 * `--stdout` - log state drifts to stdout (default: `true`)
 * `--github-token` - GitHub token for accessing private repositories
 * `--github-issues` - create GitHub issues for detected drifts
+* `--close-resolved-issues` - close GitHub issues if drift is resolved
 * `--repo-url` - URL of the repository containing the projects
 * `--branch` - branch to analyze (default: `main`). Required in case of `--repo-url`
 
