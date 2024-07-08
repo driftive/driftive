@@ -133,11 +133,10 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 	ctx := context.Background()
 	opt := &github.IssueListByRepoOptions{
 		State: "open",
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
 	}
-	opt.PerPage = 100
-
-	var issues []*github.Issue
-	var err error
 
 	// Split owner/repository_name
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
@@ -146,7 +145,7 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 	}
 
 	for {
-		issues, _, err = client.Issues.ListByRepo(
+		issues, resp, err := client.Issues.ListByRepo(
 			ctx,
 			ownerRepo[0],
 			ownerRepo[1],
@@ -158,10 +157,10 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 
 		openIssues = append(openIssues, issues...)
 
-		if len(issues) == 0 {
+		if resp.NextPage == 0 {
 			break
 		}
-		opt.Page++
+		opt.Page = resp.NextPage
 	}
 
 	return openIssues, nil
@@ -205,6 +204,12 @@ func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, issu
 				ownerRepo[0],
 				ownerRepo[1])
 
+			if _, _, err := client.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], issue.GetNumber(), &github.IssueComment{
+				Body: github.String("Drift has been resolved."),
+			}); err != nil {
+				log.Error().Msgf("Failed to comment on issue. %v", err)
+			}
+
 			_, _, err := client.Issues.Edit(
 				ctx,
 				ownerRepo[0],
@@ -217,6 +222,7 @@ func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, issu
 			if err != nil {
 				log.Error().Msgf("Failed to close issue. %v", err)
 			}
+			break
 		}
 	}
 }
