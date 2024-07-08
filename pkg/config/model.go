@@ -14,11 +14,12 @@ type DriftiveConfig struct {
 
 	LogLevel string `json:"log_level" yaml:"log_level"`
 
-	EnableStdoutResult bool   `json:"stdout_result" yaml:"stdout_result"`
-	EnableGithubIssues bool   `json:"github_issues" yaml:"github_issues"`
-	SlackWebhookUrl    string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
-	GithubToken        string `json:"github_token" yaml:"github_token"`
-	GithubContext      *gh.GithubActionContext
+	EnableStdoutResult  bool   `json:"stdout_result" yaml:"stdout_result"`
+	EnableGithubIssues  bool   `json:"github_issues" yaml:"github_issues"`
+	CloseResolvedIssues bool   `json:"close_resolved_issues" yaml:"close_resolved_issues"`
+	SlackWebhookUrl     string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
+	GithubToken         string `json:"github_token" yaml:"github_token"`
+	GithubContext       *gh.GithubActionContext
 }
 
 // DriftAnalysisConfig is the configuration for drift analysis

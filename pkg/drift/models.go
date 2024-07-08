@@ -17,8 +17,9 @@ type DriftDetector struct {
 }
 
 type DriftProjectResult struct {
-	Project    models.Project
-	Drifted    bool
+	Project models.Project
+	Drifted bool
+	// Succeeded true if the drift analysis succeeded, even if the project had drifted.
 	Succeeded  bool
 	InitOutput string
 	PlanOutput string

@@ -182,13 +182,13 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 	for _, project := range driftResult.DriftedProjects {
 		if project.Drifted {
 			g.CreateOrUpdateIssue(ghClient, openIssues, project)
-		} else if !project.Drifted && project.Succeeded {
-			g.DeleteIssueIfExists(ghClient, openIssues, project)
+		} else if g.config.CloseResolvedIssues && !project.Drifted && project.Succeeded {
+			g.CloseIssueIfExists(ghClient, openIssues, project)
 		}
 	}
 }
 
-func (g *GithubIssueNotification) DeleteIssueIfExists(client *github.Client, issues []*github.Issue, project drift.DriftProjectResult) {
+func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, issues []*github.Issue, project drift.DriftProjectResult) {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")

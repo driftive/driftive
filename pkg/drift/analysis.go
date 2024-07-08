@@ -47,16 +47,18 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	d.workerWg.Wait()
 	close(d.results)
 
-	driftedProjects := make([]DriftProjectResult, 0)
+	projectResults := make([]DriftProjectResult, 0)
+	driftedCount := 0
 	for result := range d.results {
+		projectResults = append(projectResults, result)
 		if result.Drifted {
-			driftedProjects = append(driftedProjects, result)
+			driftedCount++
 		}
 	}
 
 	result := DriftDetectionResult{
-		DriftedProjects: driftedProjects,
-		TotalDrifted:    len(driftedProjects),
+		DriftedProjects: projectResults,
+		TotalDrifted:    driftedCount,
 		TotalProjects:   len(d.Projects),
 		TotalChecked:    len(d.Projects),
 		Duration:        time.Since(startTime),
