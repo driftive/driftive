@@ -204,11 +204,13 @@ func (g *GithubIssueNotification) DeleteIssueIfExists(client *github.Client, iss
 				ownerRepo[0],
 				ownerRepo[1])
 
-			_, _, err := client.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], issue.GetNumber(), &github.IssueComment{
+			if _, _, err := client.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], issue.GetNumber(), &github.IssueComment{
 				Body: github.String("Drift has been resolved."),
-			})
+			}); err != nil {
+				log.Error().Msgf("Failed to comment on issue. %v", err)
+			}
 
-			_, _, err = client.Issues.Edit(
+			_, _, err := client.Issues.Edit(
 				ctx,
 				ownerRepo[0],
 				ownerRepo[1],
