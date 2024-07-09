@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/google/go-github/v62/github"
 	"github.com/rs/zerolog/log"
-	"os"
 	"strings"
 	"text/template"
 )
@@ -17,6 +16,8 @@ import (
 const (
 	issueTitleFormat = "drift detected: %s"
 	maxIssueBodySize = 64000 // Lower than 65535 to account for other metadata
+
+	issueBodyTemplate = "State drift in project: {{ .ProjectDir }}\n\n<details>\n<summary>Output</summary>\n\n```diff\n\n{{ .Output }}\n\n```\n\n</details>"
 )
 
 type GithubIssueNotification struct {
@@ -36,12 +37,7 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult) (*string, error) 
 		Output:     project.PlanOutput[0:utils.Min(len(project.PlanOutput), maxIssueBodySize)],
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get working directory")
-		return nil, err
-	}
-	tmpl, err := template.ParseFiles(wd + "/template/gh-issue-description.md")
+	tmpl, err := template.New("gh-issue").Parse(strings.Trim(issueBodyTemplate, " \n"))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to parse github issue description template")
 		return nil, err
