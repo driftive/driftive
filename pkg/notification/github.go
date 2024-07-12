@@ -52,7 +52,8 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult) (*string, error) 
 	return &resultStr, nil
 }
 
-func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, openIssues []*github.Issue, project drift.DriftProjectResult) {
+// CreateOrUpdateIssue creates a new issue if it doesn't exist, or updates the existing issue if it does. It returns true if a new issue was created.
+func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, openIssues []*github.Issue, project drift.DriftProjectResult, openIssueCount int) bool {
 	ctx := context.Background()
 
 	issueTitle := fmt.Sprintf(issueTitleFormat, project.Project.Dir)
@@ -61,13 +62,13 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to parse github issue description template")
-		return
+		return false
 	}
 
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
-		return
+		return false
 	}
 
 	for _, issue := range openIssues {
@@ -77,7 +78,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 					project.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
-				return
+				return false
 			} else {
 				_, _, err := client.Issues.Edit(
 					ctx,
@@ -90,7 +91,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 
 				if err != nil {
 					log.Error().Msgf("Failed to update issue. %v", err)
-					return
+					return false
 				}
 
 				log.Info().Msgf("Updated issue for project %s (repo: %s/%s)",
@@ -98,9 +99,17 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 					ownerRepo[0],
 					ownerRepo[1])
 
-				return
+				return false
 			}
 		}
+	}
+
+	if openIssueCount >= g.config.MaxOpenedIssues {
+		log.Warn().Msgf("Max number of open issues reached. Skipping issue creation for project %s (repo: %s/%s)",
+			project.Project.Dir,
+			ownerRepo[0],
+			ownerRepo[1])
+		return false
 	}
 
 	issue := &github.IssueRequest{
@@ -122,6 +131,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 	if err != nil {
 		log.Error().Msgf("Failed to create issue. %v", err)
 	}
+	return true
 }
 
 func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([]*github.Issue, error) {
@@ -175,23 +185,44 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 		return
 	}
 
+	driftiveOpenIssues := countDriftiveOpenIssues(openIssues)
+	for _, project := range driftResult.DriftedProjects {
+		if g.config.CloseResolvedIssues && !project.Drifted && project.Succeeded {
+			closed := g.CloseIssueIfExists(ghClient, openIssues, project)
+			if closed {
+				driftiveOpenIssues--
+			}
+		}
+	}
+
 	for _, project := range driftResult.DriftedProjects {
 		if project.Drifted {
-			g.CreateOrUpdateIssue(ghClient, openIssues, project)
-		} else if g.config.CloseResolvedIssues && !project.Drifted && project.Succeeded {
-			g.CloseIssueIfExists(ghClient, openIssues, project)
+			created := g.CreateOrUpdateIssue(ghClient, openIssues, project, driftiveOpenIssues)
+			if created {
+				driftiveOpenIssues++
+			}
 		}
 	}
 }
 
-func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, issues []*github.Issue, project drift.DriftProjectResult) {
+func countDriftiveOpenIssues(issues []*github.Issue) int {
+	count := 0
+	for _, issue := range issues {
+		if strings.Contains(issue.GetTitle(), "drift detected") {
+			count++
+		}
+	}
+	return count
+}
+
+func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, openIssues []*github.Issue, project drift.DriftProjectResult) bool {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
-		return
+		return false
 	}
 
-	for _, issue := range issues {
+	for _, issue := range openIssues {
 		if issue.GetTitle() == fmt.Sprintf(issueTitleFormat, project.Project.Dir) {
 			ctx := context.Background()
 
@@ -217,8 +248,11 @@ func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, issu
 
 			if err != nil {
 				log.Error().Msgf("Failed to close issue. %v", err)
+				return false
 			}
-			break
+			log.Info().Msgf("Closed issue for project %s (repo: %s/%s)", project.Project.Dir, ownerRepo[0], ownerRepo[1])
+			return true
 		}
 	}
+	return false
 }

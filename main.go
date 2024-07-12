@@ -105,10 +105,12 @@ func parseOnOff(enabled bool) string {
 
 func showInitMessage(cfg config.DriftiveConfig) {
 	log.Info().Msg("Starting driftive...")
-	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s",
+	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s. close resolved issues: %s. max opened issues: %d",
 		cfg.Concurrency,
 		parseOnOff(cfg.EnableGithubIssues),
-		parseOnOff(cfg.SlackWebhookUrl != ""))
+		parseOnOff(cfg.SlackWebhookUrl != ""),
+		parseOnOff(cfg.CloseResolvedIssues),
+		cfg.MaxOpenedIssues)
 
 	if cfg.EnableGithubIssues && (cfg.GithubToken == "" || cfg.GithubContext == nil || cfg.GithubContext.Repository == "" || cfg.GithubContext.RepositoryOwner == "") {
 		log.Fatal().Msg("Github issues are enabled but the required Github token or context is not provided. " +
