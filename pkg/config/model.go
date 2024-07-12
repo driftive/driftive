@@ -17,6 +17,7 @@ type DriftiveConfig struct {
 	EnableStdoutResult  bool   `json:"stdout_result" yaml:"stdout_result"`
 	EnableGithubIssues  bool   `json:"github_issues" yaml:"github_issues"`
 	CloseResolvedIssues bool   `json:"close_resolved_issues" yaml:"close_resolved_issues"`
+	MaxOpenedIssues     int    `json:"max_opened_issues" yaml:"max_opened_issues"`
 	SlackWebhookUrl     string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
 	GithubToken         string `json:"github_token" yaml:"github_token"`
 	GithubContext       *gh.GithubActionContext
