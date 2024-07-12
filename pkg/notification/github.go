@@ -7,7 +7,7 @@ import (
 	"driftive/pkg/drift"
 	"driftive/pkg/utils"
 	"fmt"
-	"github.com/google/go-github/v62/github"
+	"github.com/google/go-github/v63/github"
 	"github.com/rs/zerolog/log"
 	"strings"
 	"text/template"
