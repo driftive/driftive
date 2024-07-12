@@ -26,7 +26,6 @@ func (d *DriftDetector) detectDriftConcurrently(project models.Project, projectD
 }
 
 func (d *DriftDetector) DetectDrift() DriftDetectionResult {
-
 	absolutePath, err := filepath.Abs(d.RepoDir)
 	if err != nil {
 		log.Error().Msgf("Error getting absolute path of %s: %v", d.RepoDir, err)
