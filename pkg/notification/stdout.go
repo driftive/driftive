@@ -20,7 +20,7 @@ func (stdout Stdout) Send(driftResult drift.DriftDetectionResult) error {
 	log.Info().Msgf("Analysis completed in %s", driftResult.Duration)
 	log.Info().Msgf("State Drift detected in Terragrunt projects")
 	log.Info().Msgf("Drifts %d out of %d total projects", driftResult.TotalDrifted, driftResult.TotalProjects)
-	log.Info().Msgf("Projects with drift:")
+	log.Info().Msgf("Projects with state drift:")
 	for _, project := range driftResult.DriftedProjects {
 		if project.Drifted {
 			log.Info().Msgf("Project: %s", project.Project.Dir)

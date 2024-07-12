@@ -5,6 +5,7 @@ import (
 	"driftive/pkg/models"
 	"driftive/pkg/utils"
 	"github.com/rs/zerolog/log"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -25,7 +26,14 @@ func (d *DriftDetector) detectDriftConcurrently(project models.Project, projectD
 }
 
 func (d *DriftDetector) DetectDrift() DriftDetectionResult {
-	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", d.RepoDir, d.Concurrency)
+
+	absolutePath, err := filepath.Abs(d.RepoDir)
+	if err != nil {
+		log.Error().Msgf("Error getting absolute path of %s: %v", d.RepoDir, err)
+		return DriftDetectionResult{}
+	}
+
+	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", absolutePath, d.Concurrency)
 	d.results = make(chan DriftProjectResult, len(d.Projects))
 	var totalChecked = 0
 	startTime := time.Now()
