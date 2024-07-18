@@ -45,6 +45,7 @@ docker run driftive/driftive:x.y.z --help
 * `--github-token` - GitHub token for accessing private repositories
 * `--github-issues` - create GitHub issues for detected drifts
 * `--close-resolved-issues` - close GitHub issues if drift is resolved
+* `--max-opened-issues` - maximum number of open issues to create (default: 10)
 * `--repo-url` - URL of the repository containing the projects
 * `--branch` - branch to analyze (default: `main`). Required in case of `--repo-url`
 
