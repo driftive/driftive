@@ -17,7 +17,7 @@ const (
 	issueTitleFormat = "drift detected: %s"
 	maxIssueBodySize = 64000 // Lower than 65535 to account for other metadata
 
-	issueBodyTemplate = "State drift in project: {{ .ProjectDir }}\n\n<details>\n<summary>Output</summary>\n\n```diff\n\n{{ .Output }}\n\n```\n\n</details>"
+	issueBodyTemplate = "State drift in project: {{ .ProjectDir }}\n\n<details>\n<summary>Output</summary>\n\n```hcl\n\n{{ .Output }}\n\n```\n\n</details>"
 )
 
 type GithubIssueNotification struct {
