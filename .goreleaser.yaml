@@ -33,6 +33,8 @@ dockers:
     image_templates:
       - "docker.io/driftive/driftive:{{ .Version }}-amd64"
       - "docker.io/driftive/driftive:{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/driftive/driftive:{{ .Version }}-amd64"
+      - "ghcr.io/driftive/driftive:{{ .Major }}.{{ .Minor }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -46,6 +48,8 @@ dockers:
     image_templates:
       - "docker.io/driftive/driftive:{{ .Version }}-arm64v8"
       - "docker.io/driftive/driftive:{{ .Major }}.{{ .Minor }}-arm64v8"
+      - "ghcr.io/driftive/driftive:{{ .Version }}-arm64v8"
+      - "ghcr.io/driftive/driftive:{{ .Major }}.{{ .Minor }}-arm64v8"
     build_flag_templates:
       - "--platform=linux/arm64/v8"
       - "--label=org.opencontainers.image.created={{.Date}}"
@@ -63,6 +67,14 @@ docker_manifests:
     image_templates:
       - docker.io/driftive/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-amd64
       - docker.io/driftive/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-arm64v8
+  - name_template: "ghcr.io/driftive/driftive:{{ .Version }}"
+    image_templates:
+      - ghcr.io/driftive/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/driftive/{{ .ProjectName }}:{{ .Version }}-arm64v8
+  - name_template: "ghcr.io/driftive/driftive:{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - ghcr.io/driftive/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-amd64
+      - ghcr.io/driftive/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-arm64v8
 
 changelog:
   sort: asc
