@@ -45,7 +45,7 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 		}
 
 		totalChecked++
-		log.Info().Msgf("Checking drift in project %d/%d: %s", idx+1, len(d.Projects), projectDir)
+		log.Info().Msgf("Checking drift in project %d/%d: %s (%s)", idx+1, len(d.Projects), projectDir, models.ProjectTypeToStr(proj.Type))
 		d.workerWg.Add(1)
 		d.semaphore <- struct{}{}
 		go d.detectDriftConcurrently(proj, projectDir)
