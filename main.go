@@ -64,6 +64,12 @@ func main() {
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
 
+	if cfg.EnableGithubIssues && cfg.GithubToken != "" && cfg.GithubContext != nil {
+		log.Info().Msg("Sending notification to github...")
+		gh := notification.NewGithubIssueNotification(&cfg)
+		gh.Send(analysisResult)
+	}
+
 	if analysisResult.TotalDrifted > 0 {
 		if cfg.SlackWebhookUrl != "" {
 			log.Info().Msg("Sending notification to slack...")
@@ -80,12 +86,6 @@ func main() {
 			if err != nil {
 				log.Error().Msgf("Failed to print drifts to stdout. %v", err)
 			}
-		}
-
-		if cfg.EnableGithubIssues && cfg.GithubToken != "" && cfg.GithubContext != nil {
-			log.Info().Msg("Sending notification to github...")
-			gh := notification.NewGithubIssueNotification(&cfg)
-			gh.Send(analysisResult)
 		}
 	} else {
 		log.Info().Msg("No drifts detected")
