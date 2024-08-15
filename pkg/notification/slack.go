@@ -64,7 +64,7 @@ func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 		}
 		msg := fmt.Sprintf("failed to send slack request. %v. Body: %v", resp.Status, body)
 		log.Error().Msg(msg)
-		return fmt.Errorf(msg)
+		return errors.New(msg)
 	}
 	resp.Body.Close()
 
