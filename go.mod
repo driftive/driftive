@@ -1,6 +1,6 @@
 module driftive
 
-go 1.22
+go 1.23
 
 require (
 	github.com/google/go-github/v63 v63.0.0

@@ -6,6 +6,7 @@ import (
 	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"io"
@@ -47,25 +48,25 @@ func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 	if err != nil {
 		msg := fmt.Sprintf("failed to create slack request. %v", err)
 		log.Error().Msg(msg)
-		return fmt.Errorf(msg)
+		return errors.New(msg)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		msg := fmt.Sprintf("failed to send slack message. %v", err)
 		log.Error().Msg(msg)
-		return fmt.Errorf(msg)
+		return errors.New(msg)
 	}
 	if resp.StatusCode != 200 {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			msg := fmt.Sprintf("failed to read response body. %v", err)
 			log.Error().Msg(msg)
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 		msg := fmt.Sprintf("failed to send slack request. %v. Body: %v", resp.Status, body)
 		log.Error().Msg(msg)
-		return fmt.Errorf(msg)
+		return errors.New(msg)
 	}
 	resp.Body.Close()
 
