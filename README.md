@@ -23,17 +23,21 @@ $ brew install driftive/tap/driftive
 
 ## Usage
 
-CLI usage:
+### CLI usage
 ```bash 
 $ driftive --help
 $ driftive --repo-path /path/to/projects/repo --slack-url https://hooks.slack.com/services/XXXXX/XXXXX/XXXXX
 ```
 
-Docker usage:
+### Docker usage
 ```bash
 docker pull driftive/driftive:x.y.z
 docker run driftive/driftive:x.y.z --help
 ```
+
+### GitHub Action
+Driftive can be used as a GitHub action. Check it out [here](https://github.com/marketplace/actions/driftive)
+
 
 ### Configuration
 #### CLI options
@@ -58,6 +62,10 @@ and the paths to include/exclude.
 The `project_rules` section defines the executables to use for the files matching the pattern.
 `project_rules` are evaluated in the order they are defined. 
 If a file matches multiple patterns, the first matching rule is used.
+
+Each `project_rules` entry has the following fields:
+* `pattern` - glob pattern to match the files
+* `executable` - executable to use for the files matching the pattern. Supported executables: `terraform`, `terragrunt`, `tofu`
 
 Example configuration:
 ```yaml
