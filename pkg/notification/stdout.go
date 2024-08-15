@@ -1,11 +1,13 @@
 package notification
 
 import (
+	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"github.com/rs/zerolog/log"
 )
 
 type Stdout struct {
+	repoConfig *repo.DriftiveRepoConfig
 }
 
 func NewStdout() Stdout {

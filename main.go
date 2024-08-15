@@ -65,33 +65,31 @@ func main() {
 	analysisResult := driftDetector.DetectDrift()
 
 	if cfg.EnableGithubIssues && cfg.GithubToken != "" && cfg.GithubContext != nil {
-		log.Info().Msg("Sending notification to github...")
+		log.Info().Msg("Updating Github issues...")
 		gh := notification.NewGithubIssueNotification(&cfg)
 		gh.Send(analysisResult)
 	}
 
-	if analysisResult.TotalDrifted > 0 {
-		if cfg.SlackWebhookUrl != "" {
-			log.Info().Msg("Sending notification to slack...")
-			slack := notification.Slack{Url: cfg.SlackWebhookUrl}
-			err := slack.Send(analysisResult)
-			if err != nil {
-				log.Error().Msgf("Failed to send slack notification. %v", err)
-			}
+	if cfg.EnableStdoutResult {
+		stdout := notification.NewStdout()
+		err := stdout.Send(analysisResult)
+		if err != nil {
+			log.Error().Msgf("Failed to print drifts to stdout. %v", err)
 		}
-
-		if cfg.EnableStdoutResult {
-			stdout := notification.NewStdout()
-			err := stdout.Send(analysisResult)
-			if err != nil {
-				log.Error().Msgf("Failed to print drifts to stdout. %v", err)
-			}
-		}
-	} else {
-		log.Info().Msg("No drifts detected")
 	}
 
-	if analysisResult.TotalDrifted > 0 {
+	if cfg.SlackWebhookUrl != "" {
+		log.Info().Msg("Sending notification to slack...")
+		slack := notification.Slack{Url: cfg.SlackWebhookUrl}
+		err := slack.Send(analysisResult)
+		if err != nil {
+			log.Error().Msgf("Failed to send slack notification. %v", err)
+		}
+	}
+
+	if analysisResult.TotalDrifted <= 0 {
+		log.Info().Msg("No drifts detected")
+	} else {
 		os.Exit(1)
 	}
 }
