@@ -2,6 +2,7 @@ package main
 
 import (
 	"driftive/pkg/config"
+	"driftive/pkg/config/discover"
 	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
@@ -55,6 +56,7 @@ func main() {
 	repoConfig = repoConfigOrDefault(repoConfig, &cfg)
 
 	var projects []models.Project
+	projects = discover.AutoDiscoverProjects(repoDir, repoConfig)
 	log.Info().Msgf("Projects detected: %d", len(projects))
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
