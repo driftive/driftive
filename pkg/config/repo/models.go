@@ -10,6 +10,8 @@ type DriftiveRepoConfigGitHubIssues struct {
 	Enabled bool `json:"enabled" yaml:"enabled"`
 	// CloseResolved is used to close resolved driftive issues
 	CloseResolved bool `json:"close_resolved" yaml:"close_resolved"`
+	// Labels is a list of labels to apply to issues created by driftive
+	Labels []string `json:"labels" yaml:"labels"`
 	// MaxOpenIssues is the maximum number of open issues to have at any time
 	MaxOpenIssues int `json:"max_open_issues" yaml:"max_open_issues"`
 }
