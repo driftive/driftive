@@ -22,6 +22,11 @@ func loadRepoConfig(filePath string) (*repo.DriftiveRepoConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if cfg.GitHub.Issues.MaxOpenIssues == 0 {
+		cfg.GitHub.Issues.MaxOpenIssues = 10
+	}
+
 	return cfg, nil
 }
 
