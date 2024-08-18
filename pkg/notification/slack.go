@@ -24,7 +24,7 @@ func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 
 	httpClient := &http.Client{}
 	ctx := context.Background()
-	message := ":bangbang: State Drift detected in Terragrunt projects\n"
+	message := ":bangbang: State Drift detected in projects\n"
 	message += fmt.Sprintf(":gear: Drifts `%d`/`%d`\n", driftResult.TotalDrifted, driftResult.TotalProjects)
 	message += fmt.Sprintf(":clock1: Analysis duration `%s`\n", driftResult.Duration.String())
 	message += ":point_down: Projects with state drifts \n\n```"
