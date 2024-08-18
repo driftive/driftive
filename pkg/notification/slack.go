@@ -17,6 +17,12 @@ type Slack struct {
 }
 
 func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
+
+	if driftResult.TotalDrifted == 0 {
+		log.Info().Msg("No drift detected. Skipping slack notification")
+		return nil
+	}
+
 	httpClient := &http.Client{}
 	ctx := context.Background()
 	message := ":bangbang: State Drift detected in Terragrunt projects\n"
