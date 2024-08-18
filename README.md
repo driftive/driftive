@@ -98,6 +98,8 @@ github:
     enabled: true
     close_resolved: true
     max_open_issues: 10
+    labels:
+      - "drift"
 ```
 
 ### Github issues
