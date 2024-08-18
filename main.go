@@ -2,7 +2,7 @@ package main
 
 import (
 	"driftive/pkg/config"
-	"driftive/pkg/config/discover"
+	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
 	"driftive/pkg/models"
@@ -52,21 +52,16 @@ func main() {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
 
+	repoConfig = repoConfigOrDefault(repoConfig, &cfg)
+
 	var projects []models.Project
-	if repoConfig != nil {
-		log.Info().Msg("Repository config detected")
-		projects = discover.AutoDiscoverProjects(repoDir, repoConfig)
-	} else {
-		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
-		projects = discover.AutoDiscoverProjects(repoDir, config.DefaultRepoConfig())
-	}
 	log.Info().Msgf("Projects detected: %d", len(projects))
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
 
-	if cfg.EnableGithubIssues && cfg.GithubToken != "" && cfg.GithubContext != nil {
+	if repoConfig.GitHub.Issues.Enabled && cfg.GithubToken != "" && cfg.GithubContext != nil {
 		log.Info().Msg("Updating Github issues...")
-		gh := notification.NewGithubIssueNotification(&cfg)
+		gh := notification.NewGithubIssueNotification(&cfg, repoConfig)
 		gh.Send(analysisResult)
 	}
 
@@ -92,6 +87,15 @@ func main() {
 	} else {
 		os.Exit(1)
 	}
+}
+
+func repoConfigOrDefault(repoConfig *repo.DriftiveRepoConfig, cfg *config.DriftiveConfig) *repo.DriftiveRepoConfig {
+	if repoConfig == nil {
+		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
+		return config.DefaultRepoConfig(cfg)
+	}
+	log.Info().Msg("Using detected driftive.y(a)ml configuration.")
+	return repoConfig
 }
 
 func parseOnOff(enabled bool) string {

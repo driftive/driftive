@@ -194,7 +194,7 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 
 	driftiveOpenIssues := countDriftiveOpenIssues(openIssues)
 	for _, project := range driftResult.DriftedProjects {
-		if g.config.CloseResolvedIssues && !project.Drifted && project.Succeeded {
+		if g.repoConfig.GitHub.Issues.CloseResolved && !project.Drifted && project.Succeeded {
 			closed := g.CloseIssueIfExists(ghClient, openIssues, project)
 			if closed {
 				driftiveOpenIssues--

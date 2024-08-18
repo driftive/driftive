@@ -3,7 +3,6 @@ package notification
 import (
 	"bytes"
 	"context"
-	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"encoding/json"
 	"errors"
@@ -14,8 +13,7 @@ import (
 )
 
 type Slack struct {
-	Url        string
-	repoConfig *repo.DriftiveRepoConfig
+	Url string
 }
 
 func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {

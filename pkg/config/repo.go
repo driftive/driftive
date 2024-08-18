@@ -44,8 +44,15 @@ func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 	return nil, ErrMissingRepoConfig
 }
 
-func DefaultRepoConfig() *repo.DriftiveRepoConfig {
+func DefaultRepoConfig(cfg *DriftiveConfig) *repo.DriftiveRepoConfig {
 	return &repo.DriftiveRepoConfig{
+		GitHub: repo.DriftiveRepoConfigGitHub{
+			Issues: repo.DriftiveRepoConfigGitHubIssues{
+				Enabled:       cfg.EnableGithubIssues,
+				CloseResolved: cfg.CloseResolvedIssues,
+				MaxOpenIssues: cfg.MaxOpenedIssues,
+			},
+		},
 		AutoDiscover: repo.DriftiveRepoConfigAutoDiscover{
 			Inclusions: []string{"**/terragrunt.hcl", "**/*.tf"},
 			Exclusions: []string{".git/**", "**/modules/**", "**/.terragrunt-cache/**", "**/.terraform", "/terragrunt.hcl"},

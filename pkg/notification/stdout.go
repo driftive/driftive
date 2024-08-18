@@ -1,20 +1,18 @@
 package notification
 
 import (
-	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"github.com/rs/zerolog/log"
 )
 
 type Stdout struct {
-	repoConfig *repo.DriftiveRepoConfig
 }
 
 func NewStdout() Stdout {
 	return Stdout{}
 }
 
-func (stdout Stdout) Send(driftResult drift.DriftDetectionResult) error {
+func (s Stdout) Send(driftResult drift.DriftDetectionResult) error {
 	if driftResult.TotalDrifted == 0 {
 		return nil
 	}
