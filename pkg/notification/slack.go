@@ -17,7 +17,6 @@ type Slack struct {
 }
 
 func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
-
 	if driftResult.TotalDrifted == 0 {
 		log.Info().Msg("No drift detected. Skipping slack notification")
 		return nil
