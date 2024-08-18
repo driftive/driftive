@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"driftive/pkg/config"
+	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"driftive/pkg/utils"
 	"fmt"
@@ -21,11 +22,12 @@ const (
 )
 
 type GithubIssueNotification struct {
-	config *config.DriftiveConfig
+	config     *config.DriftiveConfig
+	repoConfig *repo.DriftiveRepoConfig
 }
 
-func NewGithubIssueNotification(config *config.DriftiveConfig) *GithubIssueNotification {
-	return &GithubIssueNotification{config: config}
+func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) *GithubIssueNotification {
+	return &GithubIssueNotification{config: config, repoConfig: repoConfig}
 }
 
 func parseGithubBodyTemplate(project drift.DriftProjectResult) (*string, error) {
@@ -104,7 +106,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 		}
 	}
 
-	if openIssueCount >= g.config.MaxOpenedIssues {
+	if openIssueCount >= g.repoConfig.GitHub.Issues.MaxOpenIssues {
 		log.Warn().Msgf("Max number of open issues reached. Skipping issue creation for project %s (repo: %s/%s)",
 			project.Project.Dir,
 			ownerRepo[0],
@@ -179,6 +181,11 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 	}
 
 	ghClient := github.NewClient(nil).WithAuthToken(g.config.GithubToken)
+
+	// TODO create labels if not exist
+	// create labels...
+	// TODO add breaking change to release notes (requires labels permissions)
+
 	openIssues, err := g.GetAllOpenRepoIssues(ghClient)
 	if err != nil {
 		log.Error().Msgf("Failed to get open issues. %v", err)
@@ -187,7 +194,7 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 
 	driftiveOpenIssues := countDriftiveOpenIssues(openIssues)
 	for _, project := range driftResult.DriftedProjects {
-		if g.config.CloseResolvedIssues && !project.Drifted && project.Succeeded {
+		if g.repoConfig.GitHub.Issues.CloseResolved && !project.Drifted && project.Succeeded {
 			closed := g.CloseIssueIfExists(ghClient, openIssues, project)
 			if closed {
 				driftiveOpenIssues--

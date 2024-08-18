@@ -2,7 +2,7 @@ package main
 
 import (
 	"driftive/pkg/config"
-	"driftive/pkg/config/discover"
+	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
 	"driftive/pkg/models"
@@ -52,48 +52,50 @@ func main() {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
 
+	repoConfig = repoConfigOrDefault(repoConfig, &cfg)
+
 	var projects []models.Project
-	if repoConfig != nil {
-		log.Info().Msg("Repository config detected")
-		projects = discover.AutoDiscoverProjects(repoDir, repoConfig)
-	} else {
-		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
-		projects = discover.AutoDiscoverProjects(repoDir, config.DefaultRepoConfig())
-	}
 	log.Info().Msgf("Projects detected: %d", len(projects))
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
 
-	if cfg.EnableGithubIssues && cfg.GithubToken != "" && cfg.GithubContext != nil {
-		log.Info().Msg("Sending notification to github...")
-		gh := notification.NewGithubIssueNotification(&cfg)
+	if repoConfig.GitHub.Issues.Enabled && cfg.GithubToken != "" && cfg.GithubContext != nil {
+		log.Info().Msg("Updating Github issues...")
+		gh := notification.NewGithubIssueNotification(&cfg, repoConfig)
 		gh.Send(analysisResult)
 	}
 
-	if analysisResult.TotalDrifted > 0 {
-		if cfg.SlackWebhookUrl != "" {
-			log.Info().Msg("Sending notification to slack...")
-			slack := notification.Slack{Url: cfg.SlackWebhookUrl}
-			err := slack.Send(analysisResult)
-			if err != nil {
-				log.Error().Msgf("Failed to send slack notification. %v", err)
-			}
+	if cfg.EnableStdoutResult {
+		stdout := notification.NewStdout()
+		err := stdout.Send(analysisResult)
+		if err != nil {
+			log.Error().Msgf("Failed to print drifts to stdout. %v", err)
 		}
-
-		if cfg.EnableStdoutResult {
-			stdout := notification.NewStdout()
-			err := stdout.Send(analysisResult)
-			if err != nil {
-				log.Error().Msgf("Failed to print drifts to stdout. %v", err)
-			}
-		}
-	} else {
-		log.Info().Msg("No drifts detected")
 	}
 
-	if analysisResult.TotalDrifted > 0 {
+	if cfg.SlackWebhookUrl != "" {
+		log.Info().Msg("Sending notification to slack...")
+		slack := notification.Slack{Url: cfg.SlackWebhookUrl}
+		err := slack.Send(analysisResult)
+		if err != nil {
+			log.Error().Msgf("Failed to send slack notification. %v", err)
+		}
+	}
+
+	if analysisResult.TotalDrifted <= 0 {
+		log.Info().Msg("No drifts detected")
+	} else {
 		os.Exit(1)
 	}
+}
+
+func repoConfigOrDefault(repoConfig *repo.DriftiveRepoConfig, cfg *config.DriftiveConfig) *repo.DriftiveRepoConfig {
+	if repoConfig == nil {
+		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
+		return config.DefaultRepoConfig(cfg)
+	}
+	log.Info().Msg("Using detected driftive.y(a)ml configuration.")
+	return repoConfig
 }
 
 func parseOnOff(enabled bool) string {

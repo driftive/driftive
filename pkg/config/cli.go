@@ -18,6 +18,16 @@ func validateArgs(repositoryUrl, repositoryPath, branch string) {
 	}
 }
 
+func isFlagPassed(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
 func ParseConfig() DriftiveConfig {
 	var repositoryUrl string
 	var slackWebhookUrl string
@@ -52,6 +62,14 @@ func ParseConfig() DriftiveConfig {
 
 	if err != nil {
 		log.Warn().Msgf("Failed to parse github action context. %v", err)
+	}
+
+	deprecatedFlags := []string{"github-issues:github.enabled", "close-resolved-issues:github.close_resolved", "max-opened-issues:github.max_open_issues"}
+	for _, flagPair := range deprecatedFlags {
+		flags := strings.Split(flagPair, ":")
+		if isFlagPassed(flags[0]) {
+			log.Warn().Msgf("[DEPRECATED] %s flag is deprecated and will be removed in the next releases. Please use '%s' in the .driftive.yml file.", flags[0], flags[1])
+		}
 	}
 
 	return DriftiveConfig{
