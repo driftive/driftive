@@ -49,13 +49,13 @@ func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 	return nil, ErrMissingRepoConfig
 }
 
-func DefaultRepoConfig(cfg *DriftiveConfig) *repo.DriftiveRepoConfig {
+func DefaultRepoConfig() *repo.DriftiveRepoConfig {
 	return &repo.DriftiveRepoConfig{
 		GitHub: repo.DriftiveRepoConfigGitHub{
 			Issues: repo.DriftiveRepoConfigGitHubIssues{
-				Enabled:       cfg.EnableGithubIssues,
-				CloseResolved: cfg.CloseResolvedIssues,
-				MaxOpenIssues: cfg.MaxOpenedIssues,
+				Enabled:       false,
+				CloseResolved: false,
+				MaxOpenIssues: 10,
 			},
 		},
 		AutoDiscover: repo.DriftiveRepoConfigAutoDiscover{

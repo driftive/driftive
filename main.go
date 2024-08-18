@@ -39,8 +39,6 @@ func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
 	cfg := config.ParseConfig()
 
-	showInitMessage(cfg)
-
 	repoDir, shouldDelete := determineRepositoryDir(cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
 	if shouldDelete {
 		log.Debug().Msg("Temp dir will be deleted after driftive finishes.")
@@ -51,8 +49,8 @@ func main() {
 	if err != nil && !errors.Is(err, config.ErrMissingRepoConfig) {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
-
-	repoConfig = repoConfigOrDefault(repoConfig, &cfg)
+	repoConfig = repoConfigOrDefault(repoConfig)
+	showInitMessage(cfg, repoConfig)
 
 	projects := discover.AutoDiscoverProjects(repoDir, repoConfig)
 	log.Info().Msgf("Projects detected: %d", len(projects))
@@ -89,10 +87,10 @@ func main() {
 	}
 }
 
-func repoConfigOrDefault(repoConfig *repo.DriftiveRepoConfig, cfg *config.DriftiveConfig) *repo.DriftiveRepoConfig {
+func repoConfigOrDefault(repoConfig *repo.DriftiveRepoConfig) *repo.DriftiveRepoConfig {
 	if repoConfig == nil {
 		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
-		return config.DefaultRepoConfig(cfg)
+		return config.DefaultRepoConfig()
 	}
 	log.Info().Msg("Using detected driftive.y(a)ml configuration.")
 	return repoConfig
@@ -105,16 +103,16 @@ func parseOnOff(enabled bool) string {
 	return "off"
 }
 
-func showInitMessage(cfg config.DriftiveConfig) {
+func showInitMessage(cfg config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
 	log.Info().Msg("Starting driftive...")
 	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s. close resolved issues: %s. max opened issues: %d",
 		cfg.Concurrency,
-		parseOnOff(cfg.EnableGithubIssues),
+		parseOnOff(repoConfig.GitHub.Issues.Enabled),
 		parseOnOff(cfg.SlackWebhookUrl != ""),
-		parseOnOff(cfg.CloseResolvedIssues),
-		cfg.MaxOpenedIssues)
+		parseOnOff(repoConfig.GitHub.Issues.CloseResolved),
+		repoConfig.GitHub.Issues.MaxOpenIssues)
 
-	if cfg.EnableGithubIssues && (cfg.GithubToken == "" || cfg.GithubContext == nil || cfg.GithubContext.Repository == "" || cfg.GithubContext.RepositoryOwner == "") {
+	if repoConfig.GitHub.Issues.Enabled && (cfg.GithubToken == "" || cfg.GithubContext == nil || cfg.GithubContext.Repository == "" || cfg.GithubContext.RepositoryOwner == "") {
 		log.Fatal().Msg("Github issues are enabled but the required Github token or context is not provided. " +
 			"Use the --github-token flag or set the GITHUB_TOKEN environment variable. " +
 			"Also, ensure that the GITHUB_CONTEXT environment variable is set in Github Actions.")

@@ -54,18 +54,23 @@ Driftive can be used as a GitHub action. Check it out [here](https://github.com/
 * `--branch` - branch to analyze (default: `main`). Required in case of `--repo-url`
 
 #### Repository configuration
-Driftive uses a configuration file named `driftive.yml` to define the projects to analyze. 
-The configuration file should be placed in the root directory of the repository.
-With the configuration file, you can define the projects to analyze, the executables to use, 
-and the paths to include/exclude.
 
-The `project_rules` section defines the executables to use for the files matching the pattern.
-`project_rules` are evaluated in the order they are defined. 
-If a file matches multiple patterns, the first matching rule is used.
+Driftive expects a `driftive.yml` file in the root directory of the repository.
 
-Each `project_rules` entry has the following fields:
-* `pattern` - glob pattern to match the files
-* `executable` - executable to use for the files matching the pattern. Supported executables: `terraform`, `terragrunt`, `tofu`
+It supports the following configuration options:
+* `auto_discover` - auto-discover projects in the repository
+  * `enabled` - enable auto-discovery
+  * `inclusions` - list of glob patterns to include
+  * `exclusions` - list of glob patterns to exclude
+  * `project_rules` - list of project rules to apply. Project rules are evaluated in the order they are defined. If a file matches multiple patterns, the first matching rule is used.
+    * `pattern` - glob pattern to match the files
+    * `executable` - executable to use for the files matching the pattern. Supported executables: `terraform`, `terragrunt`, `tofu`
+* `github` - GitHub configuration
+  * `issues` - GitHub issues configuration
+    * `enabled` - enable GitHub issues
+    * `close_resolved` - close resolved issues
+    * `max_open_issues` - maximum number of open issues to create
+  
 
 Example configuration:
 ```yaml
@@ -87,6 +92,12 @@ auto_discover:
 
     - pattern: "*.tf"
       executable: "terraform"
+
+github:
+  issues:
+    enabled: true
+    close_resolved: true
+    max_open_issues: 10
 ```
 
 ### Github issues
