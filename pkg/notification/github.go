@@ -114,9 +114,15 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 		return false
 	}
 
+	ghLabels := g.repoConfig.GitHub.Issues.Labels
+	if len(ghLabels) == 0 {
+		ghLabels = make([]string, 0)
+	}
+
 	issue := &github.IssueRequest{
-		Title: &issueTitle,
-		Body:  issueBody,
+		Title:  &issueTitle,
+		Body:   issueBody,
+		Labels: &ghLabels,
 	}
 
 	log.Info().Msgf("Creating issue for project %s (repo: %s/%s)",
@@ -181,10 +187,6 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 	}
 
 	ghClient := github.NewClient(nil).WithAuthToken(g.config.GithubToken)
-
-	// TODO create labels if not exist
-	// create labels...
-	// TODO add breaking change to release notes (requires labels permissions)
 
 	openIssues, err := g.GetAllOpenRepoIssues(ghClient)
 	if err != nil {
