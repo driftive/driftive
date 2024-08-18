@@ -50,7 +50,7 @@ func main() {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
 	repoConfig = repoConfigOrDefault(repoConfig)
-	printInitMessage(cfg, repoConfig)
+	showInitMessage(cfg, repoConfig)
 
 	var projects []models.Project
 	log.Info().Msgf("Projects detected: %d", len(projects))
@@ -103,7 +103,7 @@ func parseOnOff(enabled bool) string {
 	return "off"
 }
 
-func printInitMessage(cfg config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
+func showInitMessage(cfg config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
 	log.Info().Msg("Starting driftive...")
 	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s. close resolved issues: %s. max opened issues: %d",
 		cfg.Concurrency,
