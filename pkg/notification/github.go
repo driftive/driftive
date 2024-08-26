@@ -6,7 +6,9 @@ import (
 	"driftive/pkg/config"
 	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
+	"driftive/pkg/models/backend"
 	"driftive/pkg/utils"
+	"errors"
 	"fmt"
 	"github.com/google/go-github/v63/github"
 	"github.com/rs/zerolog/log"
@@ -19,6 +21,8 @@ const (
 	maxIssueBodySize = 64000 // Lower than 65535 to account for other metadata
 
 	issueBodyTemplate = "State drift in project: {{ .ProjectDir }}\n\n<details>\n<summary>Output</summary>\n\n```hcl\n\n{{ .Output }}\n\n```\n\n</details>"
+
+	ErrRepoNotProvided = "repository or owner not provided"
 )
 
 type GithubIssueNotification struct {
@@ -180,10 +184,10 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 	return openIssues, nil
 }
 
-func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
+func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (*backend.DriftIssuesState, error) {
 	if g.config.GithubContext.Repository == "" || g.config.GithubContext.RepositoryOwner == "" {
 		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
-		return
+		return nil, errors.New(ErrRepoNotProvided)
 	}
 
 	ghClient := github.NewClient(nil).WithAuthToken(g.config.GithubToken)
@@ -191,10 +195,11 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 	openIssues, err := g.GetAllOpenRepoIssues(ghClient)
 	if err != nil {
 		log.Error().Msgf("Failed to get open issues. %v", err)
-		return
+		return nil, err
 	}
 
 	driftiveOpenIssues := countDriftiveOpenIssues(openIssues)
+	initialOpenIssues := driftiveOpenIssues
 	for _, project := range driftResult.DriftedProjects {
 		if g.repoConfig.GitHub.Issues.CloseResolved && !project.Drifted && project.Succeeded {
 			closed := g.CloseIssueIfExists(ghClient, openIssues, project)
@@ -204,6 +209,7 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 		}
 	}
 
+	totalResolvedIssues := initialOpenIssues - driftiveOpenIssues
 	for _, project := range driftResult.DriftedProjects {
 		if project.Drifted {
 			created := g.CreateOrUpdateIssue(ghClient, openIssues, project, driftiveOpenIssues)
@@ -212,6 +218,12 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) {
 			}
 		}
 	}
+
+	return &backend.DriftIssuesState{
+		NumOpenIssues:     driftiveOpenIssues,
+		NumResolvedIssues: totalResolvedIssues,
+		StateUpdated:      true,
+	}, nil
 }
 
 func countDriftiveOpenIssues(issues []*github.Issue) int {

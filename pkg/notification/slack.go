@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"driftive/pkg/drift"
+	"driftive/pkg/models/backend"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,11 +14,12 @@ import (
 )
 
 type Slack struct {
-	Url string
+	Url         string
+	IssuesState *backend.DriftIssuesState
 }
 
 func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
-	if driftResult.TotalDrifted == 0 {
+	if driftResult.TotalDrifted == 0 && !didResolveIssues(slack.IssuesState) {
 		log.Info().Msg("No drift detected. Skipping slack notification")
 		return nil
 	}
@@ -27,13 +29,20 @@ func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 	message := ":bangbang: State Drift detected in projects\n"
 	message += fmt.Sprintf(":gear: Drifts `%d`/`%d`\n", driftResult.TotalDrifted, driftResult.TotalProjects)
 	message += fmt.Sprintf(":clock1: Analysis duration `%s`\n", driftResult.Duration.String())
-	message += ":point_down: Projects with state drifts \n\n```"
-	for _, project := range driftResult.DriftedProjects {
-		if project.Drifted {
-			message += fmt.Sprintf("%s\n", project.Project.Dir)
-		}
+
+	if slack.IssuesState != nil && slack.IssuesState.StateUpdated && slack.IssuesState.NumResolvedIssues > 0 {
+		message += fmt.Sprintf(":white_check_mark: Resolved issues since last analysis `%d`\n", slack.IssuesState.NumResolvedIssues)
 	}
-	message += "```"
+
+	if driftResult.TotalDrifted > 0 {
+		message += ":point_down: Projects with state drifts \n\n```"
+		for _, project := range driftResult.DriftedProjects {
+			if project.Drifted {
+				message += fmt.Sprintf("%s\n", project.Project.Dir)
+			}
+		}
+		message += "```"
+	}
 
 	type SlackMessage struct {
 		Text string `json:"text"`
@@ -74,4 +83,8 @@ func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 	resp.Body.Close()
 
 	return nil
+}
+
+func didResolveIssues(state *backend.DriftIssuesState) bool {
+	return state != nil && state.StateUpdated && state.NumResolvedIssues > 0
 }

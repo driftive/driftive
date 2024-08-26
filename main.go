@@ -6,6 +6,7 @@ import (
 	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
+	"driftive/pkg/models/backend"
 	"driftive/pkg/notification"
 	"errors"
 	"github.com/rs/zerolog"
@@ -57,10 +58,19 @@ func main() {
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
 
+	issuesState := &backend.DriftIssuesState{
+		NumOpenIssues:     -1,
+		NumResolvedIssues: -1,
+		StateUpdated:      false,
+	}
 	if repoConfig.GitHub.Issues.Enabled && cfg.GithubToken != "" && cfg.GithubContext != nil {
+		var err error
 		log.Info().Msg("Updating Github issues...")
 		gh := notification.NewGithubIssueNotification(&cfg, repoConfig)
-		gh.Send(analysisResult)
+		issuesState, err = gh.Send(analysisResult)
+		if err != nil {
+			log.Error().Msgf("Error updating Github issues. %v", err)
+		}
 	}
 
 	if cfg.EnableStdoutResult {
@@ -73,7 +83,7 @@ func main() {
 
 	if cfg.SlackWebhookUrl != "" {
 		log.Info().Msg("Sending notification to slack...")
-		slack := notification.Slack{Url: cfg.SlackWebhookUrl}
+		slack := notification.Slack{Url: cfg.SlackWebhookUrl, IssuesState: issuesState}
 		err := slack.Send(analysisResult)
 		if err != nil {
 			log.Error().Msgf("Failed to send slack notification. %v", err)
