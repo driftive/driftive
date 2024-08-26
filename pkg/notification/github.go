@@ -10,7 +10,7 @@ import (
 	"driftive/pkg/utils"
 	"errors"
 	"fmt"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v64/github"
 	"github.com/rs/zerolog/log"
 	"strings"
 	"text/template"
