@@ -6,6 +6,7 @@ import (
 	"driftive/pkg/config"
 	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
+	"driftive/pkg/models"
 	"driftive/pkg/models/backend"
 	"driftive/pkg/utils"
 	"errors"
@@ -17,24 +18,47 @@ import (
 )
 
 const (
-	issueTitleFormat = "drift detected: %s"
-	maxIssueBodySize = 64000 // Lower than 65535 to account for other metadata
-
-	issueBodyTemplate = "State drift in project: {{ .ProjectDir }}\n\n<details>\n<summary>Output</summary>\n\n```hcl\n\n{{ .Output }}\n\n```\n\n</details>"
-
-	ErrRepoNotProvided = "repository or owner not provided"
+	issueTitleFormat       = "drift detected: %s"
+	errorIssueTitleFormat  = "plan error: %s"
+	maxIssueBodySize       = 64000 // Lower than 65535 to account for other metadata
+	issueBodyTemplate      = "State drift in project: {{ .ProjectDir }}\n\n<details>\n<summary>Output</summary>\n\n```hcl\n\n{{ .Output }}\n\n```\n\n</details>"
+	errorIssueBodyTemplate = "Error in project: {{ .ProjectDir }}\n\n<details>\n<summary>Output</summary>\n\n```hcl\n\n{{ .Output }}\n\n```\n\n</details>"
+	ErrRepoNotProvided     = "repository or owner not provided"
+	ErrGHTokenNotProvided  = "github token not provided"
+	titleKeyword           = "drift detected"
+	errorTitleKeyword      = "plan error"
 )
 
 type GithubIssueNotification struct {
 	config     *config.DriftiveConfig
 	repoConfig *repo.DriftiveRepoConfig
+	ghClient   *github.Client
 }
 
-func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) *GithubIssueNotification {
-	return &GithubIssueNotification{config: config, repoConfig: repoConfig}
+type GithubIssue struct {
+	Title   string
+	Body    string
+	Labels  []string
+	Project models.Project
 }
 
-func parseGithubBodyTemplate(project drift.DriftProjectResult) (*string, error) {
+func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) (*GithubIssueNotification, error) {
+
+	if config.GithubContext.Repository == "" || config.GithubContext.RepositoryOwner == "" {
+		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
+		return nil, errors.New(ErrRepoNotProvided)
+	}
+
+	if config.GithubToken == "" {
+		log.Warn().Msg("Github token not provided. Skipping github notification")
+		return nil, errors.New(ErrGHTokenNotProvided)
+	}
+
+	ghClient := github.NewClient(nil).WithAuthToken(config.GithubToken)
+	return &GithubIssueNotification{config: config, repoConfig: repoConfig, ghClient: ghClient}, nil
+}
+
+func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate string) (*string, error) {
 	templateArgs := struct {
 		ProjectDir string
 		Output     string
@@ -43,7 +67,7 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult) (*string, error) 
 		Output:     project.PlanOutput[0:utils.Min(len(project.PlanOutput), maxIssueBodySize)],
 	}
 
-	tmpl, err := template.New("gh-issue").Parse(strings.Trim(issueBodyTemplate, " \n"))
+	tmpl, err := template.New("gh-issue").Parse(strings.Trim(bodyTemplate, " \n"))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to parse github issue description template")
 		return nil, err
@@ -59,17 +83,11 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult) (*string, error) 
 }
 
 // CreateOrUpdateIssue creates a new issue if it doesn't exist, or updates the existing issue if it does. It returns true if a new issue was created.
-func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, openIssues []*github.Issue, project drift.DriftProjectResult, openIssueCount int) bool {
+func (g *GithubIssueNotification) CreateOrUpdateIssue(
+	driftiveIssue GithubIssue,
+	openIssues []*github.Issue,
+	updateOnly bool) bool {
 	ctx := context.Background()
-
-	issueTitle := fmt.Sprintf(issueTitleFormat, project.Project.Dir)
-
-	issueBody, err := parseGithubBodyTemplate(project)
-
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to parse github issue description template")
-		return false
-	}
 
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
@@ -78,21 +96,21 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 	}
 
 	for _, issue := range openIssues {
-		if issue.GetTitle() == issueTitle {
-			if issue.GetBody() == *issueBody {
+		if issue.GetTitle() == driftiveIssue.Title {
+			if issue.GetBody() == driftiveIssue.Body {
 				log.Info().Msgf("Issue already exists for project %s (repo: %s/%s)",
-					project.Project.Dir,
+					driftiveIssue.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
 				return false
 			} else {
-				_, _, err := client.Issues.Edit(
+				_, _, err := g.ghClient.Issues.Edit(
 					ctx,
 					ownerRepo[0],
 					ownerRepo[1],
 					issue.GetNumber(),
 					&github.IssueRequest{
-						Body: issueBody,
+						Body: &driftiveIssue.Body,
 					})
 
 				if err != nil {
@@ -101,7 +119,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 				}
 
 				log.Info().Msgf("Updated issue for project %s (repo: %s/%s)",
-					project.Project.Dir,
+					driftiveIssue.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
 
@@ -110,31 +128,31 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 		}
 	}
 
-	if openIssueCount >= g.repoConfig.GitHub.Issues.MaxOpenIssues {
+	if updateOnly {
 		log.Warn().Msgf("Max number of open issues reached. Skipping issue creation for project %s (repo: %s/%s)",
-			project.Project.Dir,
+			driftiveIssue.Project.Dir,
 			ownerRepo[0],
 			ownerRepo[1])
 		return false
 	}
 
-	ghLabels := g.repoConfig.GitHub.Issues.Labels
+	ghLabels := driftiveIssue.Labels
 	if len(ghLabels) == 0 {
 		ghLabels = make([]string, 0)
 	}
 
 	issue := &github.IssueRequest{
-		Title:  &issueTitle,
-		Body:   issueBody,
+		Title:  &driftiveIssue.Title,
+		Body:   &driftiveIssue.Body,
 		Labels: &ghLabels,
 	}
 
 	log.Info().Msgf("Creating issue for project %s (repo: %s/%s)",
-		project.Project.Dir,
+		driftiveIssue.Project.Dir,
 		ownerRepo[0],
 		ownerRepo[1])
 
-	_, _, err = client.Issues.Create(
+	_, _, err := g.ghClient.Issues.Create(
 		ctx,
 		ownerRepo[0],
 		ownerRepo[1],
@@ -146,7 +164,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(client *github.Client, ope
 	return true
 }
 
-func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([]*github.Issue, error) {
+func (g *GithubIssueNotification) GetAllOpenRepoIssues() ([]*github.Issue, error) {
 	var openIssues []*github.Issue
 	ctx := context.Background()
 	opt := &github.IssueListByRepoOptions{
@@ -163,7 +181,7 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 	}
 
 	for {
-		issues, resp, err := client.Issues.ListByRepo(
+		issues, resp, err := g.ghClient.Issues.ListByRepo(
 			ctx,
 			ownerRepo[0],
 			ownerRepo[1],
@@ -185,58 +203,133 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues(client *github.Client) ([
 }
 
 func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (*backend.DriftIssuesState, error) {
-	if g.config.GithubContext.Repository == "" || g.config.GithubContext.RepositoryOwner == "" {
-		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
-		return nil, errors.New(ErrRepoNotProvided)
-	}
-
-	ghClient := github.NewClient(nil).WithAuthToken(g.config.GithubToken)
-
-	openIssues, err := g.GetAllOpenRepoIssues(ghClient)
+	allOpenIssues, err := g.GetAllOpenRepoIssues()
 	if err != nil {
 		log.Error().Msgf("Failed to get open issues. %v", err)
 		return nil, err
 	}
 
-	driftiveOpenIssues := countDriftiveOpenIssues(openIssues)
-	initialOpenIssues := driftiveOpenIssues
-	for _, project := range driftResult.DriftedProjects {
-		if g.repoConfig.GitHub.Issues.CloseResolved && !project.Drifted && project.Succeeded {
-			closed := g.CloseIssueIfExists(ghClient, openIssues, project)
-			if closed {
-				driftiveOpenIssues--
+	driftOpenIssues := countIssuesByLabelsOrTitle(allOpenIssues, g.repoConfig.GitHub.Issues.Labels, titleKeyword)
+	initialOpenIssues := driftOpenIssues
+	if g.repoConfig.GitHub.Issues.CloseResolved {
+		for _, project := range driftResult.ProjectResults {
+			if !project.Drifted && project.Succeeded {
+				closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(issueTitleFormat, project.Project.Dir))
+				if closed {
+					driftOpenIssues--
+				}
 			}
 		}
 	}
 
-	totalResolvedIssues := initialOpenIssues - driftiveOpenIssues
-	for _, project := range driftResult.DriftedProjects {
-		if project.Drifted {
-			created := g.CreateOrUpdateIssue(ghClient, openIssues, project, driftiveOpenIssues)
+	totalResolvedIssues := initialOpenIssues - driftOpenIssues
+	// Create issues for drifted projects
+	for _, projectResult := range driftResult.ProjectResults {
+		if projectResult.Drifted {
+
+			issueBody, err := parseGithubBodyTemplate(projectResult, issueBodyTemplate)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to parse github issue description template")
+				continue
+			}
+
+			issue := GithubIssue{
+				Title:   fmt.Sprintf(issueTitleFormat, projectResult.Project.Dir),
+				Body:    *issueBody,
+				Labels:  g.repoConfig.GitHub.Issues.Labels,
+				Project: projectResult.Project,
+			}
+			created := g.CreateOrUpdateIssue(
+				issue,
+				allOpenIssues,
+				driftOpenIssues >= g.repoConfig.GitHub.Issues.MaxOpenIssues,
+			)
 			if created {
-				driftiveOpenIssues++
+				driftOpenIssues++
+			}
+		}
+	}
+
+	errorOpenIssues := countIssuesByLabelsOrTitle(allOpenIssues, g.repoConfig.GitHub.Issues.Errors.Labels, errorTitleKeyword)
+	initialErrorOpenIssues := errorOpenIssues
+	if g.repoConfig.GitHub.Issues.Errors.CloseResolved {
+		for _, project := range driftResult.ProjectResults {
+			if !project.Drifted && !project.Succeeded {
+				closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(errorIssueTitleFormat, project.Project.Dir))
+				if closed {
+					errorOpenIssues--
+				}
+			}
+		}
+	}
+	totalResolvedErrorIssues := initialErrorOpenIssues - errorOpenIssues
+
+	// Create issues for failed projects
+	// TODO validate if there are error labels being used in drift labels during config time!
+	if g.repoConfig.GitHub.Issues.Errors.Enabled {
+		for _, projectResult := range driftResult.ProjectResults {
+			if !projectResult.Succeeded && !projectResult.Drifted {
+				issueBody, err := parseGithubBodyTemplate(projectResult, errorIssueBodyTemplate)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to parse github issue description template")
+					continue
+				}
+
+				issue := GithubIssue{
+					Title:   fmt.Sprintf(errorIssueTitleFormat, projectResult.Project.Dir),
+					Body:    *issueBody,
+					Labels:  g.repoConfig.GitHub.Issues.Errors.Labels,
+					Project: projectResult.Project,
+				}
+				created := g.CreateOrUpdateIssue(
+					issue,
+					allOpenIssues,
+					errorOpenIssues >= g.repoConfig.GitHub.Issues.Errors.MaxOpenIssues,
+				)
+				if created {
+					errorOpenIssues++
+				}
 			}
 		}
 	}
 
 	return &backend.DriftIssuesState{
-		NumOpenIssues:     driftiveOpenIssues,
-		NumResolvedIssues: totalResolvedIssues,
-		StateUpdated:      true,
+		NumOpenIssues:          driftOpenIssues,
+		NumResolvedIssues:      totalResolvedIssues,
+		NumOpenErrorIssues:     errorOpenIssues,
+		NumResolvedErrorIssues: totalResolvedErrorIssues,
+		StateUpdated:           true,
 	}, nil
 }
 
-func countDriftiveOpenIssues(issues []*github.Issue) int {
+func containsAnyLabel(issue *github.Issue, labels []string) bool {
+	for _, label := range issue.Labels {
+		for _, l := range labels {
+			if l == label.GetName() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// countIssuesByLabelsOrTitle counts the number of issues that have any of the labels or the title contains the keyword
+func countIssuesByLabelsOrTitle(issues []*github.Issue, labels []string, titleKeyword string) int {
 	count := 0
 	for _, issue := range issues {
-		if strings.Contains(issue.GetTitle(), "drift detected") {
+		if containsAnyLabel(issue, labels) {
 			count++
+			continue
+		}
+		if strings.Contains(issue.GetTitle(), titleKeyword) {
+			count++
+			continue
 		}
 	}
 	return count
 }
 
-func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, openIssues []*github.Issue, project drift.DriftProjectResult) bool {
+func (g *GithubIssueNotification) CloseIssueIfExists(openIssues []*github.Issue, project drift.DriftProjectResult, issueTitle string) bool {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
@@ -244,7 +337,7 @@ func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, open
 	}
 
 	for _, issue := range openIssues {
-		if issue.GetTitle() == fmt.Sprintf(issueTitleFormat, project.Project.Dir) {
+		if issue.GetTitle() == issueTitle {
 			ctx := context.Background()
 
 			log.Info().Msgf("Closing issue for project %s (repo: %s/%s)",
@@ -252,13 +345,13 @@ func (g *GithubIssueNotification) CloseIssueIfExists(client *github.Client, open
 				ownerRepo[0],
 				ownerRepo[1])
 
-			if _, _, err := client.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], issue.GetNumber(), &github.IssueComment{
-				Body: github.String("Drift has been resolved."),
+			if _, _, err := g.ghClient.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], issue.GetNumber(), &github.IssueComment{
+				Body: github.String("Issue has been resolved."),
 			}); err != nil {
 				log.Error().Msgf("Failed to comment on issue. %v", err)
 			}
 
-			_, _, err := client.Issues.Edit(
+			_, _, err := g.ghClient.Issues.Edit(
 				ctx,
 				ownerRepo[0],
 				ownerRepo[1],
