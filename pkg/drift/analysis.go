@@ -64,11 +64,11 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	}
 
 	result := DriftDetectionResult{
-		DriftedProjects: projectResults,
-		TotalDrifted:    driftedCount,
-		TotalProjects:   len(d.Projects),
-		TotalChecked:    len(d.Projects),
-		Duration:        time.Since(startTime),
+		ProjectResults: projectResults,
+		TotalDrifted:   driftedCount,
+		TotalProjects:  len(d.Projects),
+		TotalChecked:   len(d.Projects),
+		Duration:       time.Since(startTime),
 	}
 	return result
 }
@@ -86,7 +86,7 @@ func (d *DriftDetector) detectDrift(project models.Project) (DriftProjectResult,
 	if err != nil {
 		log.Info().Msgf("Error running plan command in %s: %v", project.Dir, err)
 		log.Info().Msg(output)
-		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false, InitOutput: "", PlanOutput: output}, err
+		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false, InitOutput: "", PlanOutput: executor.ParseErrorOutput(output)}, err
 	}
 	driftDetected := d.isDriftDetected(output)
 	if driftDetected {

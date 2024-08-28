@@ -26,11 +26,11 @@ type DriftProjectResult struct {
 }
 
 type DriftDetectionResult struct {
-	DriftedProjects []DriftProjectResult
-	TotalDrifted    int
-	TotalProjects   int
-	TotalChecked    int
-	Duration        time.Duration
+	ProjectResults []DriftProjectResult
+	TotalDrifted   int
+	TotalProjects  int
+	TotalChecked   int
+	Duration       time.Duration
 }
 
 func NewDriftDetector(repoDir string, projects []models.Project, concurrency int) DriftDetector {

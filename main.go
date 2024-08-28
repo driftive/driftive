@@ -66,10 +66,12 @@ func main() {
 	if repoConfig.GitHub.Issues.Enabled && cfg.GithubToken != "" && cfg.GithubContext != nil {
 		var err error
 		log.Info().Msg("Updating Github issues...")
-		gh := notification.NewGithubIssueNotification(&cfg, repoConfig)
-		issuesState, err = gh.Send(analysisResult)
-		if err != nil {
-			log.Error().Msgf("Error updating Github issues. %v", err)
+		gh, err := notification.NewGithubIssueNotification(&cfg, repoConfig)
+		if err == nil {
+			issuesState, err = gh.Send(analysisResult)
+			if err != nil {
+				log.Error().Msgf("Error updating Github issues. %v", err)
+			}
 		}
 	}
 

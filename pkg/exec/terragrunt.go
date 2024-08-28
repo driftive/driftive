@@ -19,3 +19,7 @@ func (t TerragruntExecutor) Plan(args ...string) (string, error) {
 func (t TerragruntExecutor) ParsePlan(output string) string {
 	return parsePlan(output)
 }
+
+func (t TerragruntExecutor) ParseErrorOutput(output string) string {
+	return parseErrorOutput(output)
+}

@@ -19,3 +19,7 @@ func (t TofuExecutor) Plan(args ...string) (string, error) {
 func (t TofuExecutor) ParsePlan(output string) string {
 	return parsePlan(output)
 }
+
+func (t TofuExecutor) ParseErrorOutput(output string) string {
+	return parseErrorOutput(output)
+}
