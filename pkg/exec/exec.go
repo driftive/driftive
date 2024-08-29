@@ -2,6 +2,7 @@ package exec
 
 import (
 	"driftive/pkg/models"
+	"errors"
 	"github.com/rs/zerolog/log"
 	"os/exec"
 )
@@ -39,5 +40,13 @@ func RunCommandInDir(dir, name string, arg ...string) (string, error) {
 	cmd := exec.Command(name, arg...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
+	if err != nil {
+		var exiterr *exec.ExitError
+		if errors.As(err, &exiterr) {
+			log.Debug().Msgf("Error running command in %s: %s %v.\nExit error: %s", dir, name, arg, exiterr)
+		} else {
+			log.Debug().Msgf("Error running command in %s: %s %v.\nError: %s", dir, name, arg, err)
+		}
+	}
 	return string(out), err
 }
