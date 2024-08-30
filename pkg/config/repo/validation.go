@@ -10,9 +10,11 @@ var ErrInvalidLabelName = "invalid label name"
 var ErrConflictingLabels = "conflicting drift and error labels"
 
 func ValidateRepoConfig(repoConfig *DriftiveRepoConfig) {
+	//nolint:staticcheck
 	if nil == repoConfig {
 		log.Fatal().Err(errors.New(ErrMissingRepoConfig)).Msg("Repository config is required. Please create a .driftive.y(a)ml file in the root of the repository.")
 	}
+	//nolint:staticcheck
 	if nil != repoConfig.GitHub.Issues.Labels {
 		for _, label := range repoConfig.GitHub.Issues.Labels {
 			if label == "" {
