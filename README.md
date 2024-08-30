@@ -47,9 +47,6 @@ Driftive can be used as a GitHub action. Check it out [here](https://github.com/
 * `--log-level` - log level. Available options: `debug`, `info`, `warn`, `error` (default: `info`)
 * `--stdout` - log state drifts to stdout (default: `true`)
 * `--github-token` - GitHub token for accessing private repositories
-* `--github-issues` - create GitHub issues for detected drifts
-* `--close-resolved-issues` - close GitHub issues if drift is resolved
-* `--max-opened-issues` - maximum number of open issues to create (default: 10)
 * `--repo-url` - URL of the repository containing the projects
 * `--branch` - branch to analyze (default: `main`). Required in case of `--repo-url`
 
@@ -95,11 +92,17 @@ auto_discover:
 
 github:
   issues:
-    enabled: true
+    enabled: true # create issues for detected drifts
     close_resolved: true
     max_open_issues: 10
     labels:
       - "drift"
+    errors:
+      enabled: true # create issues for projects with errors
+      close_resolved: true
+      max_open_issues: 5
+      labels:
+        - "plan-failed"
 ```
 
 ### Github issues
