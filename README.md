@@ -66,7 +66,12 @@ It supports the following configuration options:
   * `issues` - GitHub issues configuration
     * `enabled` - enable GitHub issues
     * `close_resolved` - close resolved issues
-    * `max_open_issues` - maximum number of open issues to create
+    * `max_open_issues` - maximum number of drift issues to keep open
+    * `errors` - create issues for projects with errors
+      * `enabled` - enable GitHub issues for projects with errors
+      * `close_resolved` - close resolved issues
+      * `max_open_issues` - maximum number of issues to keep open
+      * `labels` - list of labels to apply to the issues
   
 
 Example configuration:
