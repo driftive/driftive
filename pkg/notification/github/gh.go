@@ -107,11 +107,12 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (
 				}
 			}
 		}
+	} else if errorOpenIssues > 0 {
+		log.Warn().Msg("Note: There are GH error issues but driftive is not configured to close them.")
 	}
 	totalResolvedErrorIssues := initialErrorOpenIssues - errorOpenIssues
 
 	// Create issues for failed projects
-	// TODO validate if there are error labels being used in drift labels during config time!
 	if g.repoConfig.GitHub.Issues.Errors.Enabled {
 		for _, projectResult := range driftResult.ProjectResults {
 			if !projectResult.Succeeded && !projectResult.Drifted {
