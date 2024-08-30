@@ -1,4 +1,4 @@
-package notification
+package console
 
 import (
 	"driftive/pkg/drift"
