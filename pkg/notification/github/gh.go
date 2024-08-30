@@ -73,7 +73,6 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (
 	// Create issues for drifted projects
 	for _, projectResult := range driftResult.ProjectResults {
 		if projectResult.Drifted {
-
 			issueBody, err := parseGithubBodyTemplate(projectResult, issueBodyTemplate)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to parse github issue description template")

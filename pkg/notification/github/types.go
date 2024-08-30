@@ -23,7 +23,6 @@ type GithubIssue struct {
 }
 
 func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) (*GithubIssueNotification, error) {
-
 	if config.GithubContext.Repository == "" || config.GithubContext.RepositoryOwner == "" {
 		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
 		return nil, errors.New(ErrRepoNotProvided)
