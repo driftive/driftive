@@ -4,6 +4,7 @@ import (
 	"driftive/pkg/models"
 	"errors"
 	"github.com/rs/zerolog/log"
+	"os"
 	"os/exec"
 )
 
@@ -38,6 +39,8 @@ func RunCommand(name string, arg ...string) (string, error) {
 func RunCommandInDir(dir, name string, arg ...string) (string, error) {
 	log.Debug().Msgf("Running command in %s: %s %v", dir, name, arg)
 	cmd := exec.Command(name, arg...)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "TERRAGRUNT_FORWARD_TF_STDOUT=true")
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
