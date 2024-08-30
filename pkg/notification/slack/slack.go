@@ -1,4 +1,4 @@
-package notification
+package slack
 
 import (
 	"bytes"
@@ -36,7 +36,7 @@ func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
 
 	if driftResult.TotalDrifted > 0 {
 		message += ":point_down: Projects with state drifts \n\n```"
-		for _, project := range driftResult.DriftedProjects {
+		for _, project := range driftResult.ProjectResults {
 			if project.Drifted {
 				message += fmt.Sprintf("%s\n", project.Project.Dir)
 			}

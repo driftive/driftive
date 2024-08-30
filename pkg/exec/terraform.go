@@ -19,3 +19,7 @@ func (t TerraformExecutor) Plan(args ...string) (string, error) {
 func (t TerraformExecutor) ParsePlan(output string) string {
 	return parsePlan(output)
 }
+
+func (t TerraformExecutor) ParseErrorOutput(output string) string {
+	return parseErrorOutput(output)
+}

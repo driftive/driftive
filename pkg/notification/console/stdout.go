@@ -1,4 +1,4 @@
-package notification
+package console
 
 import (
 	"driftive/pkg/drift"
@@ -21,7 +21,7 @@ func (s Stdout) Send(driftResult drift.DriftDetectionResult) error {
 	log.Info().Msgf("State Drift detected in projects")
 	log.Info().Msgf("Drifts %d out of %d total projects", driftResult.TotalDrifted, driftResult.TotalProjects)
 	log.Info().Msgf("Projects with state drift:")
-	for _, project := range driftResult.DriftedProjects {
+	for _, project := range driftResult.ProjectResults {
 		if project.Drifted {
 			log.Info().Msgf("Project: %s", project.Project.Dir)
 		}

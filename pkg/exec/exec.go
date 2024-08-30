@@ -2,6 +2,7 @@ package exec
 
 import (
 	"driftive/pkg/models"
+	"errors"
 	"github.com/rs/zerolog/log"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ type Executor interface {
 	Init(args ...string) (string, error)
 	Plan(args ...string) (string, error)
 	ParsePlan(output string) string
+	ParseErrorOutput(output string) string
 }
 
 func NewExecutor(dir string, t models.ProjectType) Executor {
@@ -41,5 +43,13 @@ func RunCommandInDir(dir, name string, arg ...string) (string, error) {
 	cmd.Env = append(cmd.Env, "TERRAGRUNT_FORWARD_TF_STDOUT=true")
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
+	if err != nil {
+		var exiterr *exec.ExitError
+		if errors.As(err, &exiterr) {
+			log.Debug().Msgf("Error running command in %s: %s %v.\nExit error: %s", dir, name, arg, exiterr)
+		} else {
+			log.Debug().Msgf("Error running command in %s: %s %v.\nError: %s", dir, name, arg, err)
+		}
+	}
 	return string(out), err
 }

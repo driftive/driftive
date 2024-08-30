@@ -8,8 +8,8 @@ import (
 )
 
 func TestErrorOutput(t *testing.T) {
-	file := utils.GetTestFile("testdata/outputs/error_planning.txt")
-	expected := utils.GetTestFile("testdata/outputs/error_planning_expected.txt")
+	file := utils.GetTestFile("test/output/error_planning.txt")
+	expected := utils.GetTestFile("test/output/error_planning_expected.txt")
 	tf := NewExecutor("testdata", models.Terraform)
 	result := tf.ParsePlan(string(file))
 	if result != strings.Trim(string(expected), " \n") {
@@ -18,8 +18,8 @@ func TestErrorOutput(t *testing.T) {
 }
 
 func TestChangesOutput(t *testing.T) {
-	file := utils.GetTestFile("testdata/outputs/changes.txt")
-	expected := utils.GetTestFile("testdata/outputs/changes_expected.txt")
+	file := utils.GetTestFile("test/output/changes.txt")
+	expected := utils.GetTestFile("test/output/changes_expected.txt")
 	tf := NewExecutor("testdata", models.Terraform)
 	result := tf.ParsePlan(string(file))
 	if result != strings.Trim(string(expected), " \n") {
