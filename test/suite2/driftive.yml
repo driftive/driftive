@@ -28,3 +28,5 @@ github:
       enabled: true
       close_resolved: true
       max_open_issues: 1
+      labels:
+        - "plan-failed"

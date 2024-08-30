@@ -49,6 +49,38 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate stri
 	return &resultStr, nil
 }
 
+func (g *GithubIssueNotification) closeResolvedDriftIssues(allOpenIssues []*github.Issue, result drift.DriftDetectionResult) int {
+	if !g.repoConfig.GitHub.Issues.CloseResolved {
+		return 0
+	}
+	closedIssues := 0
+	for _, project := range result.ProjectResults {
+		if !project.Drifted && project.Succeeded {
+			closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(issueTitleFormat, project.Project.Dir))
+			if closed {
+				closedIssues++
+			}
+		}
+	}
+	return closedIssues
+}
+
+func (g *GithubIssueNotification) closeResolvedErrorIssues(allOpenIssues []*github.Issue, result drift.DriftDetectionResult) int {
+	if !g.repoConfig.GitHub.Issues.Errors.CloseResolved {
+		return 0
+	}
+	closedIssues := 0
+	for _, project := range result.ProjectResults {
+		if project.Succeeded && g.repoConfig.GitHub.Issues.Errors.CloseResolved {
+			closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(errorIssueTitleFormat, project.Project.Dir))
+			if closed {
+				closedIssues++
+			}
+		}
+	}
+	return closedIssues
+}
+
 func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (*backend.DriftIssuesState, error) {
 	allOpenIssues, err := g.GetAllOpenRepoIssues()
 	if err != nil {
@@ -57,19 +89,13 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (
 	}
 
 	driftOpenIssues := countIssuesByLabelsOrTitle(allOpenIssues, g.repoConfig.GitHub.Issues.Labels, titleKeyword)
-	initialOpenIssues := driftOpenIssues
-	if g.repoConfig.GitHub.Issues.CloseResolved {
-		for _, project := range driftResult.ProjectResults {
-			if !project.Drifted && project.Succeeded {
-				closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(issueTitleFormat, project.Project.Dir))
-				if closed {
-					driftOpenIssues--
-				}
-			}
-		}
+	closedDriftIssues := g.closeResolvedDriftIssues(allOpenIssues, driftResult)
+	driftOpenIssues = driftOpenIssues - closedDriftIssues
+
+	if driftOpenIssues > 0 && !g.repoConfig.GitHub.Issues.CloseResolved {
+		log.Warn().Msg("Note: There are GH drift issues but driftive is not configured to close them.")
 	}
 
-	totalResolvedIssues := initialOpenIssues - driftOpenIssues
 	// Create issues for drifted projects
 	for _, projectResult := range driftResult.ProjectResults {
 		if projectResult.Drifted {
@@ -97,25 +123,17 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (
 	}
 
 	errorOpenIssues := countIssuesByLabelsOrTitle(allOpenIssues, g.repoConfig.GitHub.Issues.Errors.Labels, errorTitleKeyword)
-	initialErrorOpenIssues := errorOpenIssues
-	if g.repoConfig.GitHub.Issues.Errors.CloseResolved {
-		for _, project := range driftResult.ProjectResults {
-			if !project.Drifted && !project.Succeeded {
-				closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(errorIssueTitleFormat, project.Project.Dir))
-				if closed {
-					errorOpenIssues--
-				}
-			}
-		}
-	} else if errorOpenIssues > 0 {
+	closedErrIssues := g.closeResolvedErrorIssues(allOpenIssues, driftResult)
+	errorOpenIssues = errorOpenIssues - closedErrIssues
+
+	if errorOpenIssues > 0 && !g.repoConfig.GitHub.Issues.Errors.CloseResolved {
 		log.Warn().Msg("Note: There are GH error issues but driftive is not configured to close them.")
 	}
-	totalResolvedErrorIssues := initialErrorOpenIssues - errorOpenIssues
 
 	// Create issues for failed projects
 	if g.repoConfig.GitHub.Issues.Errors.Enabled {
 		for _, projectResult := range driftResult.ProjectResults {
-			if !projectResult.Succeeded && !projectResult.Drifted {
+			if !projectResult.Succeeded {
 				issueBody, err := parseGithubBodyTemplate(projectResult, errorIssueBodyTemplate)
 				if err != nil {
 					log.Error().Err(err).Msg("Failed to parse github issue description template")
@@ -142,9 +160,9 @@ func (g *GithubIssueNotification) Send(driftResult drift.DriftDetectionResult) (
 
 	return &backend.DriftIssuesState{
 		NumOpenIssues:          driftOpenIssues,
-		NumResolvedIssues:      totalResolvedIssues,
+		NumResolvedIssues:      closedDriftIssues,
 		NumOpenErrorIssues:     errorOpenIssues,
-		NumResolvedErrorIssues: totalResolvedErrorIssues,
+		NumResolvedErrorIssues: closedErrIssues,
 		StateUpdated:           true,
 	}, nil
 }
