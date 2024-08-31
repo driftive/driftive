@@ -2,16 +2,19 @@ This issue shows your drift summary.
 
 ## Rate-Limited
 
-These issues are currently rate-limited.
+Issues for the following projects were not created due to configured rate limits:
+
 * `projs/project4`
 ## Drifts
 
-These issues show the drifts between the desired and actual state of your resources.
+2 drift issues are open:
+
 * `projs/project1`
 * `projs/project2`
 ## Errors
 
-These issues show the errors that occurred during the drift analysis.
+1 error issues are open:
+
 * `projs/project3`
 <!--
 summary-state-start
