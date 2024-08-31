@@ -26,6 +26,7 @@ const (
 	errorTitleKeyword                = "plan error"
 	issueBodyProjectNameStartKeyword = "<!--PROJECT_JSON_START-->"
 	issueBodyProjectNameEndKeyword   = "<!--PROJECT_JSON_END-->"
+	ErrIssueMetadataNotFound         = "issue_metadata_not_found"
 )
 
 //go:embed template/gh-issue-description.md
@@ -35,7 +36,6 @@ var issueBodyTemplate string
 var errorIssueBodyTemplate string
 
 func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate string) (*string, error) {
-
 	projectKind := DriftIssueKind
 	if !project.Drifted && !project.Succeeded {
 		projectKind = ErrorIssueKind
@@ -79,40 +79,8 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate stri
 	return &resultStr, nil
 }
 
-func (g *GithubIssueNotification) closeResolvedDriftIssues(allOpenIssues []*github.Issue, result drift.DriftDetectionResult) int {
-	if !g.repoConfig.GitHub.Issues.CloseResolved {
-		return 0
-	}
-	closedIssues := 0
-	for _, project := range result.ProjectResults {
-		if !project.Drifted && project.Succeeded {
-			closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(issueTitleFormat, project.Project.Dir))
-			if closed {
-				closedIssues++
-			}
-		}
-	}
-	return closedIssues
-}
-
-func (g *GithubIssueNotification) closeResolvedErrorIssues(allOpenIssues []*github.Issue, result drift.DriftDetectionResult) int {
-	if !g.repoConfig.GitHub.Issues.Errors.CloseResolved {
-		return 0
-	}
-	closedIssues := 0
-	for _, project := range result.ProjectResults {
-		if project.Succeeded && g.repoConfig.GitHub.Issues.Errors.CloseResolved {
-			closed := g.CloseIssueIfExists(allOpenIssues, project, fmt.Sprintf(errorIssueTitleFormat, project.Project.Dir))
-			if closed {
-				closedIssues++
-			}
-		}
-	}
-	return closedIssues
-}
-
 func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.DriftDetectionResult) (*GithubState, error) {
-	allOpenIssues, err := g.GetAllOpenRepoIssues()
+	allOpenIssues, err := g.GetAllOpenRepoIssues(ctx)
 	if err != nil {
 		log.Error().Msgf("Failed to get open issues. %v", err)
 		return nil, err
@@ -176,6 +144,7 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 				Kind:    DriftIssueKind,
 			}
 			created, createdIssue := g.CreateOrUpdateIssue(
+				ctx,
 				issue,
 				allOpenIssues,
 				numOpenDriftIssues >= g.repoConfig.GitHub.Issues.MaxOpenIssues,
@@ -215,6 +184,7 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 					Kind:    ErrorIssueKind,
 				}
 				created, createdIssue := g.CreateOrUpdateIssue(
+					ctx,
 					issue,
 					allOpenIssues,
 					numOpenErrorIssues >= g.repoConfig.GitHub.Issues.Errors.MaxOpenIssues,
@@ -262,49 +232,20 @@ func projectIssueToProject(projectIssue ProjectIssue) models.Project {
 }
 
 func projectIssueListToProjectList(projectIssues []ProjectIssue) []models.Project {
-	var projects []models.Project
+	projects := make([]models.Project, 0)
 	for _, projectIssue := range projectIssues {
 		projects = append(projects, projectIssueToProject(projectIssue))
 	}
 	return projects
 }
 
-func containsAnyLabel(issue *github.Issue, labels []string) bool {
-	for _, label := range issue.Labels {
-		for _, l := range labels {
-			if l == label.GetName() {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// countIssuesByLabelsOrTitle counts the number of issues that have any of the labels or the title contains the keyword
-func countIssuesByLabelsOrTitle(issues []*github.Issue, labels []string, titleKeyword string) int {
-	count := 0
-	for _, issue := range issues {
-		if containsAnyLabel(issue, labels) {
-			count++
-			continue
-		}
-		if strings.Contains(issue.GetTitle(), titleKeyword) {
-			count++
-			continue
-		}
-	}
-	return count
-}
-
 // getProjectIssuesFromGHIssueBodies lists the issues that have any of the labels or the title contains the keyword
 func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []ProjectIssue {
-
-	var issues []ProjectIssue
+	issues := make([]ProjectIssue, 0)
 	for _, issue := range ghIssues {
-
 		project, err := getProjectFromIssueBody(issue.GetBody())
 		if err != nil {
-			log.Warn().Msgf("Failed to get project name from issue metadata. Issue: %s", issue.GetTitle())
+			log.Warn().Err(err).Msgf("Failed to get project name from issue metadata. Issue title: %s", issue.GetTitle())
 			continue
 		}
 
@@ -318,9 +259,7 @@ func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []ProjectIssue 
 			Issue:   *issue,
 			Kind:    project.Kind,
 		})
-
 	}
-
 	return issues
 }
 
@@ -340,7 +279,7 @@ func getProjectFromIssueBody(body string) (*GHProject, error) {
 	var project GHProject
 	if err := json.Unmarshal([]byte(projectJson), &project); err != nil {
 		log.Warn().Msgf("Failed to find project details from issue body. %v. Ignoring issue.", err)
-		return nil, nil
+		return nil, errors.New(ErrIssueMetadataNotFound)
 	}
 
 	return &project, nil

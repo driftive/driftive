@@ -11,11 +11,10 @@ import (
 
 // CreateOrUpdateIssue creates a new issue if it doesn't exist, or updates the existing issue if it does. It returns true if a new issue was created.
 func (g *GithubIssueNotification) CreateOrUpdateIssue(
+	ctx context.Context,
 	driftiveIssue GithubIssue,
 	openIssues []*github.Issue,
 	updateOnly bool) (bool, *github.Issue) {
-	ctx := context.Background()
-
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
@@ -95,9 +94,8 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 	return true, createdIssue
 }
 
-func (g *GithubIssueNotification) GetAllOpenRepoIssues() ([]*github.Issue, error) {
+func (g *GithubIssueNotification) GetAllOpenRepoIssues(ctx context.Context) ([]*github.Issue, error) {
 	var openIssues []*github.Issue
-	ctx := context.Background()
 	opt := &github.IssueListByRepoOptions{
 		State: "open",
 		ListOptions: github.ListOptions{

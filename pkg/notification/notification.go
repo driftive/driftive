@@ -29,7 +29,6 @@ func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *r
 }
 
 func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisResult drift.DriftDetectionResult) {
-
 	issuesState := &backend.DriftIssuesState{
 		NumOpenIssues:     -1,
 		NumResolvedIssues: -1,
