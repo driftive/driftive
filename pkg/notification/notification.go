@@ -8,6 +8,7 @@ import (
 	"driftive/pkg/models/backend"
 	"driftive/pkg/notification/console"
 	"driftive/pkg/notification/github"
+	"driftive/pkg/notification/github/summary"
 	"driftive/pkg/notification/slack"
 	"github.com/rs/zerolog/log"
 )
@@ -15,10 +16,6 @@ import (
 type NotificationHandler struct {
 	repoConfig     *repo.DriftiveRepoConfig
 	driftiveConfig *config.DriftiveConfig
-}
-
-type NotificationsResult struct {
-	Github *github.GithubState
 }
 
 func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) *NotificationHandler {
@@ -29,7 +26,6 @@ func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *r
 }
 
 func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisResult drift.DriftDetectionResult) {
-
 	issuesState := &backend.DriftIssuesState{
 		NumOpenIssues:     -1,
 		NumResolvedIssues: -1,
@@ -44,7 +40,12 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 			if err != nil {
 				log.Error().Msgf("ErrorIssueKind updating Github issues. %v", err)
 			}
-			log.Info().Msgf("Github issues updated. Result: %v", ghResult)
+			log.Info().Msgf("Github issues updated")
+			if h.repoConfig.GitHub.Summary.Enabled {
+				summary.NewGithubSummaryHandler(h.driftiveConfig, h.repoConfig).UpdateSummary(ctx, ghResult)
+			} else {
+				log.Info().Msg("Github summary is disabled")
+			}
 		}
 	}
 

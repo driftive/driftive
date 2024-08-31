@@ -19,7 +19,6 @@ func filterIssues(issues []ProjectIssue, issuesToRemove []ProjectIssue) []Projec
 		}
 	}
 	return filteredIssues
-
 }
 
 func containsIssue(issues []ProjectIssue, issue ProjectIssue) bool {

@@ -29,8 +29,16 @@ type DriftiveRepoConfigGitHubIssues struct {
 	Errors DriftiveRepoConfigGitHubIssuesErrors `json:"errors" yaml:"errors"`
 }
 
+type DriftiveRepoConfigGitHubSummary struct {
+	// Enabled is used to enable or disable GitHub summary
+	Enabled bool `json:"enabled" yaml:"enabled"`
+	// IssueTitle is the title of the issue created by driftive for the summary
+	IssueTitle string `json:"issue_title" yaml:"issue_title"`
+}
+
 type DriftiveRepoConfigGitHub struct {
-	Issues DriftiveRepoConfigGitHubIssues `json:"issues" yaml:"issues"`
+	Issues  DriftiveRepoConfigGitHubIssues  `json:"issues" yaml:"issues"`
+	Summary DriftiveRepoConfigGitHubSummary `json:"summary" yaml:"summary"`
 }
 
 // DriftiveRepoConfig is used to configure driftive for a repository.

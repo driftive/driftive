@@ -3,7 +3,8 @@ This issue shows your drift summary.
 {{if .RateLimitedProjects -}}
 ## Rate-Limited
 
-These issues are currently rate-limited.
+Issues for the following projects were not created due to configured rate limits:
+
 {{ range $project := .RateLimitedProjects -}}
 * `{{ $project }}`
 {{ end -}}
@@ -12,7 +13,8 @@ These issues are currently rate-limited.
 {{if .DriftedProjects -}}
 ## Drifts
 
-These issues show the drifts between the desired and actual state of your resources.
+{{ len .DriftedProjects }} drift issues are open:
+
 {{ range $project := .DriftedProjects -}}
 * `{{ $project }}`
 {{ end -}}
@@ -23,7 +25,8 @@ No drifts found.
 {{if .ErroredProjects -}}
 ## Errors
 
-These issues show the errors that occurred during the drift analysis.
+{{ len .ErroredProjects }} error issues are open:
+
 {{ range $project := .ErroredProjects -}}
 * `{{ $project }}`
 {{ end -}}

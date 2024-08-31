@@ -9,17 +9,26 @@ import (
 	"strings"
 )
 
+type CreateOrUpdateResult struct {
+	Created     bool
+	RateLimited bool
+	Issue       *github.Issue
+}
+
 // CreateOrUpdateIssue creates a new issue if it doesn't exist, or updates the existing issue if it does. It returns true if a new issue was created.
 func (g *GithubIssueNotification) CreateOrUpdateIssue(
 	ctx context.Context,
 	driftiveIssue GithubIssue,
 	openIssues []*github.Issue,
-	updateOnly bool) (bool, *github.Issue) {
-	ctx := context.Background()
+	updateOnly bool) CreateOrUpdateResult {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
-		return false, nil
+		return CreateOrUpdateResult{
+			Created:     false,
+			RateLimited: false,
+			Issue:       nil,
+		}
 	}
 
 	for _, issue := range openIssues {
@@ -30,7 +39,11 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 					driftiveIssue.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
-				return false, nil
+				return CreateOrUpdateResult{
+					Created:     false,
+					RateLimited: false,
+					Issue:       nil,
+				}
 			} else {
 				_, _, err := g.ghClient.Issues.Edit(
 					ctx,
@@ -43,7 +56,11 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 
 				if err != nil {
 					log.Error().Msgf("Failed to update issue. %v", err)
-					return false, nil
+					return CreateOrUpdateResult{
+						Created:     false,
+						RateLimited: false,
+						Issue:       nil,
+					}
 				}
 
 				log.Info().Msgf("Updated issue [%s] for project %s (repo: %s/%s)",
@@ -52,7 +69,11 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 					ownerRepo[0],
 					ownerRepo[1])
 
-				return false, nil
+				return CreateOrUpdateResult{
+					Created:     false,
+					RateLimited: false,
+					Issue:       nil,
+				}
 			}
 		}
 	}
@@ -63,7 +84,11 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 			driftiveIssue.Project.Dir,
 			ownerRepo[0],
 			ownerRepo[1])
-		return false, nil
+		return CreateOrUpdateResult{
+			Created:     false,
+			RateLimited: true,
+			Issue:       nil,
+		}
 	}
 
 	ghLabels := driftiveIssue.Labels
@@ -92,7 +117,11 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 	if err != nil {
 		log.Error().Msgf("Failed to create issue. %v", err)
 	}
-	return true, createdIssue
+	return CreateOrUpdateResult{
+		Created:     true,
+		RateLimited: false,
+		Issue:       createdIssue,
+	}
 }
 
 func (g *GithubIssueNotification) GetAllOpenRepoIssues(ctx context.Context) ([]*github.Issue, error) {

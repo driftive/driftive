@@ -30,3 +30,5 @@ github:
       max_open_issues: 1
       labels:
         - "plan-failed"
+  summary:
+    enabled: true

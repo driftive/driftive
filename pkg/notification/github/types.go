@@ -66,6 +66,8 @@ type GithubState struct {
 
 	ErrorIssuesOpen     []models.Project
 	ErrorIssuesResolved []models.Project
+
+	RateLimitedDrifts []string
 }
 
 func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) (*GithubIssueNotification, error) {
