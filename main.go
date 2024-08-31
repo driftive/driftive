@@ -1,15 +1,13 @@
 package main
 
 import (
+	"context"
 	"driftive/pkg/config"
 	"driftive/pkg/config/discover"
 	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
-	"driftive/pkg/models/backend"
-	"driftive/pkg/notification/console"
-	"driftive/pkg/notification/github"
-	"driftive/pkg/notification/slack"
+	"driftive/pkg/notification"
 	"errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -41,6 +39,7 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
 	cfg := config.ParseConfig()
+	ctx := context.Background()
 
 	repoDir, shouldDelete := determineRepositoryDir(cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
 	if shouldDelete {
@@ -61,39 +60,8 @@ func main() {
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
 	analysisResult := driftDetector.DetectDrift()
 
-	issuesState := &backend.DriftIssuesState{
-		NumOpenIssues:     -1,
-		NumResolvedIssues: -1,
-		StateUpdated:      false,
-	}
-	if repoConfig.GitHub.Issues.Enabled && cfg.GithubToken != "" && cfg.GithubContext != nil {
-		var err error
-		log.Info().Msg("Updating Github issues...")
-		gh, err := github.NewGithubIssueNotification(&cfg, repoConfig)
-		if err == nil {
-			issuesState, err = gh.Send(analysisResult)
-			if err != nil {
-				log.Error().Msgf("Error updating Github issues. %v", err)
-			}
-		}
-	}
-
-	if cfg.EnableStdoutResult {
-		stdout := console.NewStdout()
-		err := stdout.Send(analysisResult)
-		if err != nil {
-			log.Error().Msgf("Failed to print drifts to stdout. %v", err)
-		}
-	}
-
-	if cfg.SlackWebhookUrl != "" {
-		log.Info().Msg("Sending notification to slack...")
-		slackNotification := slack.Slack{Url: cfg.SlackWebhookUrl, IssuesState: issuesState}
-		err := slackNotification.Send(analysisResult)
-		if err != nil {
-			log.Error().Msgf("Failed to send slack notification. %v", err)
-		}
-	}
+	notification.NewNotificationHandler(&cfg, repoConfig).
+		HandleNotifications(ctx, analysisResult)
 
 	if analysisResult.TotalDrifted <= 0 {
 		log.Info().Msg("No drifts detected")
