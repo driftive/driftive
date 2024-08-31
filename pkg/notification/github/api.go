@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"driftive/pkg/drift"
 	"fmt"
 	"github.com/google/go-github/v64/github"
 	"github.com/rs/zerolog/log"
@@ -10,25 +11,25 @@ import (
 
 // CreateOrUpdateIssue creates a new issue if it doesn't exist, or updates the existing issue if it does. It returns true if a new issue was created.
 func (g *GithubIssueNotification) CreateOrUpdateIssue(
+	ctx context.Context,
 	driftiveIssue GithubIssue,
 	openIssues []*github.Issue,
-	updateOnly bool) bool {
-	ctx := context.Background()
-
+	updateOnly bool) (bool, *github.Issue) {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
-		return false
+		return false, nil
 	}
 
 	for _, issue := range openIssues {
 		if issue.GetTitle() == driftiveIssue.Title {
 			if issue.GetBody() == driftiveIssue.Body {
-				log.Info().Msgf("Issue already exists for project %s (repo: %s/%s)",
+				log.Info().Msgf("Issue [%s] already exists for project %s (repo: %s/%s)",
+					IssueKindToString(driftiveIssue.Kind),
 					driftiveIssue.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
-				return false
+				return false, nil
 			} else {
 				_, _, err := g.ghClient.Issues.Edit(
 					ctx,
@@ -41,25 +42,27 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 
 				if err != nil {
 					log.Error().Msgf("Failed to update issue. %v", err)
-					return false
+					return false, nil
 				}
 
-				log.Info().Msgf("Updated issue for project %s (repo: %s/%s)",
+				log.Info().Msgf("Updated issue [%s] for project %s (repo: %s/%s)",
+					IssueKindToString(driftiveIssue.Kind),
 					driftiveIssue.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
 
-				return false
+				return false, nil
 			}
 		}
 	}
 
 	if updateOnly {
-		log.Warn().Msgf("Max number of open issues reached. Skipping issue creation for project %s (repo: %s/%s)",
+		log.Warn().Msgf("Max number of open issues reached. Skipping issue [%s] creation for project %s (repo: %s/%s)",
+			IssueKindToString(driftiveIssue.Kind),
 			driftiveIssue.Project.Dir,
 			ownerRepo[0],
 			ownerRepo[1])
-		return false
+		return false, nil
 	}
 
 	ghLabels := driftiveIssue.Labels
@@ -73,12 +76,13 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 		Labels: &ghLabels,
 	}
 
-	log.Info().Msgf("Creating issue for project %s (repo: %s/%s)",
+	log.Info().Msgf("Creating issue [%s] for project %s (repo: %s/%s)",
+		IssueKindToString(driftiveIssue.Kind),
 		driftiveIssue.Project.Dir,
 		ownerRepo[0],
 		ownerRepo[1])
 
-	_, _, err := g.ghClient.Issues.Create(
+	createdIssue, _, err := g.ghClient.Issues.Create(
 		ctx,
 		ownerRepo[0],
 		ownerRepo[1],
@@ -87,12 +91,11 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 	if err != nil {
 		log.Error().Msgf("Failed to create issue. %v", err)
 	}
-	return true
+	return true, createdIssue
 }
 
-func (g *GithubIssueNotification) GetAllOpenRepoIssues() ([]*github.Issue, error) {
+func (g *GithubIssueNotification) GetAllOpenRepoIssues(ctx context.Context) ([]*github.Issue, error) {
 	var openIssues []*github.Issue
-	ctx := context.Background()
 	opt := &github.IssueListByRepoOptions{
 		State: "open",
 		ListOptions: github.ListOptions{
@@ -126,4 +129,82 @@ func (g *GithubIssueNotification) GetAllOpenRepoIssues() ([]*github.Issue, error
 	}
 
 	return openIssues, nil
+}
+
+func (g *GithubIssueNotification) CloseIssueIfExists(openIssues []*github.Issue, project drift.DriftProjectResult, issueTitle string) bool {
+	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
+	if len(ownerRepo) != 2 {
+		log.Error().Msg("Invalid repository name")
+		return false
+	}
+
+	for _, issue := range openIssues {
+		if issue.GetTitle() == issueTitle {
+			ctx := context.Background()
+
+			log.Info().Msgf("Closing issue for project %s (repo: %s/%s)",
+				project.Project.Dir,
+				ownerRepo[0],
+				ownerRepo[1])
+
+			if _, _, err := g.ghClient.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], issue.GetNumber(), &github.IssueComment{
+				Body: github.String("Issue has been resolved."),
+			}); err != nil {
+				log.Error().Msgf("Failed to comment on issue. %v", err)
+			}
+
+			_, _, err := g.ghClient.Issues.Edit(
+				ctx,
+				ownerRepo[0],
+				ownerRepo[1],
+				issue.GetNumber(),
+				&github.IssueRequest{
+					State: github.String("closed"),
+				})
+
+			if err != nil {
+				log.Error().Msgf("Failed to close issue. %v", err)
+				return false
+			}
+			log.Info().Msgf("Closed issue for project %s (repo: %s/%s)", project.Project.Dir, ownerRepo[0], ownerRepo[1])
+			return true
+		}
+	}
+	return false
+}
+
+func (g *GithubIssueNotification) CloseIssue(ctx context.Context, projectIssue ProjectIssue) bool {
+	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
+	if len(ownerRepo) != 2 {
+		log.Error().Msg("Invalid repository name")
+		return false
+	}
+
+	log.Info().Msgf("Closing issue [%s] for project %s (repo: %s/%s)",
+		IssueKindToString(projectIssue.Kind),
+		projectIssue.Project.Dir,
+		ownerRepo[0],
+		ownerRepo[1])
+
+	if _, _, err := g.ghClient.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], projectIssue.Issue.GetNumber(), &github.IssueComment{
+		Body: github.String("Issue has been resolved."),
+	}); err != nil {
+		log.Error().Msgf("Failed to comment on issue. %v", err)
+	}
+
+	_, _, err := g.ghClient.Issues.Edit(
+		ctx,
+		ownerRepo[0],
+		ownerRepo[1],
+		projectIssue.Issue.GetNumber(),
+		&github.IssueRequest{
+			State: github.String("closed"),
+		})
+
+	if err != nil {
+		log.Error().Msgf("Failed to close issue. %v", err)
+		return false
+	}
+	log.Info().Msgf("Closed issue [%s] for project %s (repo: %s/%s)", IssueKindToString(projectIssue.Kind), projectIssue.Project.Dir, ownerRepo[0], ownerRepo[1])
+	return true
 }

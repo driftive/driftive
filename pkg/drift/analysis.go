@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func (d *DriftDetector) detectDriftConcurrently(project models.Project, projectDir string) {
+func (d *DriftDetector) detectDriftConcurrently(project models.TypedProject, projectDir string) {
 	defer func() {
 		<-d.semaphore
 	}()
@@ -73,7 +73,7 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 	return result
 }
 
-func (d *DriftDetector) detectDrift(project models.Project) (DriftProjectResult, error) {
+func (d *DriftDetector) detectDrift(project models.TypedProject) (DriftProjectResult, error) {
 	executor := exec.NewExecutor(project.Dir, project.Type)
 	output, err := executor.Init("-upgrade", "-lock=false", "-no-color")
 

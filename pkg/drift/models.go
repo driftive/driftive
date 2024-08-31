@@ -9,7 +9,7 @@ import (
 
 type DriftDetector struct {
 	RepoDir     string
-	Projects    []models.Project
+	Projects    []models.TypedProject
 	Concurrency int
 	workerWg    sync.WaitGroup
 	results     chan DriftProjectResult
@@ -17,7 +17,7 @@ type DriftDetector struct {
 }
 
 type DriftProjectResult struct {
-	Project models.Project
+	Project models.TypedProject
 	Drifted bool
 	// Succeeded true if the drift analysis succeeded, even if the project had drifted.
 	Succeeded  bool
@@ -33,7 +33,7 @@ type DriftDetectionResult struct {
 	Duration       time.Duration
 }
 
-func NewDriftDetector(repoDir string, projects []models.Project, concurrency int) DriftDetector {
+func NewDriftDetector(repoDir string, projects []models.TypedProject, concurrency int) DriftDetector {
 	return DriftDetector{
 		RepoDir:     repoDir,
 		Projects:    projects,

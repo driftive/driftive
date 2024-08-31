@@ -18,14 +18,13 @@ type Slack struct {
 	IssuesState *backend.DriftIssuesState
 }
 
-func (slack Slack) Send(driftResult drift.DriftDetectionResult) error {
+func (slack Slack) Send(ctx context.Context, driftResult drift.DriftDetectionResult) error {
 	if driftResult.TotalDrifted == 0 && !didResolveIssues(slack.IssuesState) {
 		log.Info().Msg("No drift detected. Skipping slack notification")
 		return nil
 	}
 
 	httpClient := &http.Client{}
-	ctx := context.Background()
 	message := ":bangbang: State Drift detected in projects\n"
 	message += fmt.Sprintf(":gear: Drifts `%d`/`%d`\n", driftResult.TotalDrifted, driftResult.TotalProjects)
 	message += fmt.Sprintf(":clock1: Analysis duration `%s`\n", driftResult.Duration.String())

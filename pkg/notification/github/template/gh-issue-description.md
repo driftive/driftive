@@ -4,6 +4,13 @@ State drift in project: {{ .ProjectDir }}
 <summary>Output</summary>
 
 ```hcl
+
 {{ .Output }}
+
 ```
+
 </details>
+
+<!--PROJECT_JSON_START-->
+<!--{{ .ProjectJSON }}-->
+<!--PROJECT_JSON_END-->

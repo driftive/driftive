@@ -8,8 +8,12 @@ const (
 	Terragrunt
 )
 
-// Project represents a TF/Tofu/Terragrunt project to be analyzed
 type Project struct {
+	Dir string `json:"dir" yaml:"dir"`
+}
+
+// TypedProject represents a TF/Tofu/Terragrunt project to be analyzed
+type TypedProject struct {
 	Dir  string      `json:"dir" yaml:"dir"`
 	Type ProjectType `json:"type" yaml:"type"`
 }

@@ -22,9 +22,9 @@ type DriftiveConfig struct {
 
 // DriftAnalysisConfig is the configuration for drift analysis
 type DriftAnalysisConfig struct {
-	Projects      []models.Project `json:"projects" yaml:"projects"`
-	BasePath      string           `json:"base_path" yaml:"base_path"`
-	Concurrency   int              `json:"concurrency" yaml:"concurrency"`
-	GithubToken   string           `json:"github_token" yaml:"github_token"`
+	Projects      []models.TypedProject `json:"projects" yaml:"projects"`
+	BasePath      string                `json:"base_path" yaml:"base_path"`
+	Concurrency   int                   `json:"concurrency" yaml:"concurrency"`
+	GithubToken   string                `json:"github_token" yaml:"github_token"`
 	GithubContext *gh.GithubActionContext
 }

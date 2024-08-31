@@ -54,9 +54,9 @@ func isPartOfCacheFolder(dir string) bool {
 	return strings.Contains(dir, ".terragrunt-cache") || strings.Contains(dir, ".terraform")
 }
 
-func AutoDiscoverProjects(rootDir string, config *repo.DriftiveRepoConfig) []models.Project {
+func AutoDiscoverProjects(rootDir string, config *repo.DriftiveRepoConfig) []models.TypedProject {
 	projs := getAllPossibleProjectPaths(rootDir, config)
-	mapProjects := make(map[string]*models.Project)
+	mapProjects := make(map[string]*models.TypedProject)
 	rules := config.AutoDiscover.ProjectRules
 
 	for _, proj := range projs {
@@ -80,7 +80,7 @@ func AutoDiscoverProjects(rootDir string, config *repo.DriftiveRepoConfig) []mod
 				}
 				if match {
 					projectType := executableToProjectType(rule.Executable)
-					project := &models.Project{
+					project := &models.TypedProject{
 						Dir:  proj,
 						Type: projectType,
 					}
@@ -100,7 +100,7 @@ func AutoDiscoverProjects(rootDir string, config *repo.DriftiveRepoConfig) []mod
 		}
 	}
 
-	driftiveProjects := make([]models.Project, 0, len(mapProjects))
+	driftiveProjects := make([]models.TypedProject, 0, len(mapProjects))
 	for _, project := range mapProjects {
 		driftiveProjects = append(driftiveProjects, *project)
 	}
