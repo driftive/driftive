@@ -37,7 +37,7 @@ func ParseConfig() DriftiveConfig {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level. Options: trace, debug, info, warn, error, fatal, panic")
 	flag.BoolVar(&enableStdoutResult, "stdout", true, "Enable printing drift results to stdout")
 	flag.StringVar(&githubToken, "github-token", "", "Github token")
-	flag.BoolVar(&exitCode, "exit-code", false, "Exit with code 1 if drift is detected")
+	flag.BoolVar(&exitCode, "exit-code", false, "Exit with code 1 if any state drift is detected")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, branch)
