@@ -65,7 +65,7 @@ func main() {
 
 	if analysisResult.TotalDrifted <= 0 {
 		log.Info().Msg("No drifts detected")
-	} else {
+	} else if cfg.ExitCode {
 		os.Exit(1)
 	}
 }
