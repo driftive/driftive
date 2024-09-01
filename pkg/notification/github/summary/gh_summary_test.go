@@ -1,7 +1,10 @@
 package summary
 
 import (
+	"driftive/pkg/models"
+	"driftive/pkg/notification/github/types"
 	_ "embed"
+	"github.com/google/go-github/v64/github"
 	"strings"
 	"testing"
 )
@@ -11,8 +14,32 @@ var expected string
 
 func TestGetSummaryIssueBody(t *testing.T) {
 	summary := GithubSummary{
-		DriftedProjects:     []string{"projs/project1", "projs/project2"},
-		ErroredProjects:     []string{"projs/project3"},
+		DriftedProjects: []types.ProjectIssue{{
+			Project: models.Project{
+				Dir: "projs/project1",
+			},
+			Issue: github.Issue{
+				Number: github.Int(1),
+			},
+			Kind: "drift",
+		}, {
+			Project: models.Project{
+				Dir: "projs/project2",
+			},
+			Issue: github.Issue{
+				Number: github.Int(2),
+			},
+			Kind: "drift",
+		}},
+		ErroredProjects: []types.ProjectIssue{{
+			Project: models.Project{
+				Dir: "projs/project3",
+			},
+			Issue: github.Issue{
+				Number: github.Int(3),
+			},
+			Kind: "drift",
+		}},
 		RateLimitedProjects: []string{"projs/project4"},
 		LastAnalysisDate:    "2021-08-01T03:32:12Z",
 	}

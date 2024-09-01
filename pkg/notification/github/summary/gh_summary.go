@@ -5,8 +5,7 @@ import (
 	"context"
 	"driftive/pkg/config"
 	"driftive/pkg/config/repo"
-	github2 "driftive/pkg/notification/github"
-	"driftive/pkg/utils"
+	driftiveGithub "driftive/pkg/notification/github/types"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -21,24 +20,29 @@ import (
 var summaryTemplate string
 
 type GithubSummary struct {
-	RateLimitedProjects []string `json:"rate_limited_projects"`
-	DriftedProjects     []string `json:"drifted_projects"`
-	ErroredProjects     []string `json:"errored_projects"`
-	LastAnalysisDate    string   `json:"last_analysis_date"`
+	RateLimitedProjects []string                      `json:"rate_limited_projects"`
+	DriftedProjects     []driftiveGithub.ProjectIssue `json:"drifted_projects"`
+	ErroredProjects     []driftiveGithub.ProjectIssue `json:"errored_projects"`
+	LastAnalysisDate    string                        `json:"last_analysis_date"`
 }
 
 type GithubSummaryHandler struct {
-	repoConfig *repo.DriftiveRepoConfig
-	config     *config.DriftiveConfig
-	ghClient   *github.Client
+	repoConfig    *repo.DriftiveRepoConfig
+	config        *config.DriftiveConfig
+	ghClient      *github.Client
+	allOpenIssues []*github.Issue
 }
 
-func NewGithubSummaryHandler(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) *GithubSummaryHandler {
+func NewGithubSummaryHandler(
+	config *config.DriftiveConfig,
+	repoConfig *repo.DriftiveRepoConfig,
+	allOpenIssues []*github.Issue) *GithubSummaryHandler {
 	ghClient := github.NewClient(nil).WithAuthToken(config.GithubToken)
 	return &GithubSummaryHandler{
-		config:     config,
-		repoConfig: repoConfig,
-		ghClient:   ghClient,
+		config:        config,
+		repoConfig:    repoConfig,
+		ghClient:      ghClient,
+		allOpenIssues: allOpenIssues,
 	}
 }
 
@@ -112,7 +116,7 @@ func (g *GithubSummaryHandler) listAllIssues(ctx context.Context) ([]*github.Iss
 	return openIssues, nil
 }
 
-func (g *GithubSummaryHandler) UpdateSummary(ctx context.Context, state *github2.GithubState) {
+func (g *GithubSummaryHandler) UpdateSummary(ctx context.Context, state *driftiveGithub.GithubState) {
 	log.Info().Msg("Updating Github summary issue...")
 	// Split owner/repository_name
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
@@ -137,8 +141,8 @@ func (g *GithubSummaryHandler) UpdateSummary(ctx context.Context, state *github2
 
 	summary := GithubSummary{
 		RateLimitedProjects: state.RateLimitedDrifts,
-		DriftedProjects:     utils.ExtractProjectDirs(state.DriftIssuesOpen),
-		ErroredProjects:     utils.ExtractProjectDirs(state.ErrorIssuesOpen),
+		DriftedProjects:     state.DriftIssuesOpen,
+		ErroredProjects:     state.ErrorIssuesOpen,
 		LastAnalysisDate:    time.Now().Format(time.RFC3339),
 	}
 

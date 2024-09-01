@@ -13,10 +13,10 @@ Issues for the following projects were not created due to configured rate limits
 {{if .DriftedProjects -}}
 ## Drifts
 
-{{ len .DriftedProjects }} drift issues are open:
+Drift issues open: {{ len .DriftedProjects }}
 
 {{ range $project := .DriftedProjects -}}
-* `{{ $project }}`
+* [{{ $project.Project.Dir }}](../issues/{{ $project.Issue.Number }})
 {{ end -}}
 {{ else -}}
 No drifts found.
@@ -25,10 +25,10 @@ No drifts found.
 {{if .ErroredProjects -}}
 ## Errors
 
-{{ len .ErroredProjects }} error issues are open:
+Error issues open: {{ len .ErroredProjects }}
 
 {{ range $project := .ErroredProjects -}}
-* `{{ $project }}`
+* [{{ $project.Project.Dir }}](../issues/{{ $project.Issue.Number }})
 {{ end -}}
 {{ end -}}
 

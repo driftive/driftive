@@ -18,6 +18,8 @@ auto_discover:
       executable: "terraform"
 
 github:
+  summary:
+    enabled: true
   issues:
     enabled: true
     close_resolved: true
@@ -30,5 +32,3 @@ github:
       max_open_issues: 1
       labels:
         - "plan-failed"
-  summary:
-    enabled: true

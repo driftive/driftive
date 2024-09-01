@@ -3,8 +3,12 @@ package github
 import (
 	"bytes"
 	"context"
+	"driftive/pkg/config"
+	"driftive/pkg/config/repo"
 	"driftive/pkg/drift"
 	"driftive/pkg/models"
+	"driftive/pkg/notification/github/summary"
+	"driftive/pkg/notification/github/types"
 	"driftive/pkg/utils"
 	_ "embed"
 	"encoding/json"
@@ -22,8 +26,6 @@ const (
 	maxIssueBodySize                 = 64000 // Lower than 65535 to account for other metadata
 	ErrRepoNotProvided               = "repository or owner not provided"
 	ErrGHTokenNotProvided            = "github token not provided"
-	titleKeyword                     = "drift detected"
-	errorTitleKeyword                = "plan error"
 	issueBodyProjectNameStartKeyword = "<!--PROJECT_JSON_START-->"
 	issueBodyProjectNameEndKeyword   = "<!--PROJECT_JSON_END-->"
 	ErrIssueMetadataNotFound         = "issue_metadata_not_found"
@@ -35,13 +37,34 @@ var issueBodyTemplate string
 //go:embed template/gh-error-issue-description.md
 var errorIssueBodyTemplate string
 
-func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate string) (*string, error) {
-	projectKind := DriftIssueKind
-	if !project.Drifted && !project.Succeeded {
-		projectKind = ErrorIssueKind
+type GithubIssueNotification struct {
+	config     *config.DriftiveConfig
+	repoConfig *repo.DriftiveRepoConfig
+	ghClient   *github.Client
+}
+
+func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) (*GithubIssueNotification, error) {
+	if config.GithubContext.Repository == "" || config.GithubContext.RepositoryOwner == "" {
+		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
+		return nil, errors.New(ErrRepoNotProvided)
 	}
 
-	ghProject := GHProject{
+	if config.GithubToken == "" {
+		log.Warn().Msg("Github token not provided. Skipping github notification")
+		return nil, errors.New(ErrGHTokenNotProvided)
+	}
+
+	ghClient := github.NewClient(nil).WithAuthToken(config.GithubToken)
+	return &GithubIssueNotification{config: config, repoConfig: repoConfig, ghClient: ghClient}, nil
+}
+
+func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate string) (*string, error) {
+	projectKind := types.DriftIssueKind
+	if !project.Drifted && !project.Succeeded {
+		projectKind = types.ErrorIssueKind
+	}
+
+	ghProject := types.GHProject{
 		Project: models.Project{
 			Dir: project.Project.Dir,
 		},
@@ -79,30 +102,49 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate stri
 	return &resultStr, nil
 }
 
-func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.DriftDetectionResult) (*GithubState, error) {
+func (g *GithubIssueNotification) Handle(ctx context.Context, analysisResult drift.DriftDetectionResult) (*types.GithubState, error) {
 	allOpenIssues, err := g.GetAllOpenRepoIssues(ctx)
 	if err != nil {
 		log.Error().Msgf("Failed to get open issues. %v", err)
 		return nil, err
 	}
 
+	state, err := g.HandleIssues(ctx, analysisResult, allOpenIssues)
+	if err != nil {
+		log.Error().Msgf("Failed to update github issues. %v", err)
+		return nil, err
+	}
+
+	log.Info().Msgf("Github issues updated")
+	if g.repoConfig.GitHub.Summary.Enabled {
+		summary.NewGithubSummaryHandler(g.config, g.repoConfig, allOpenIssues).UpdateSummary(ctx, state)
+	} else {
+		log.Info().Msg("Github summary is disabled. Skipping summary update")
+	}
+
+	return state, nil
+}
+
+func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
+	driftResult drift.DriftDetectionResult,
+	allOpenIssues []*github.Issue) (*types.GithubState, error) {
 	allDriftiveOpenIssues := getProjectIssuesFromGHIssueBodies(allOpenIssues)
 	numOpenDriftIssues := 0
 	for _, issue := range allDriftiveOpenIssues {
-		if issue.Kind == DriftIssueKind {
+		if issue.Kind == types.DriftIssueKind {
 			numOpenDriftIssues++
 		}
 	}
 	numOpenErrorIssues := 0
 	for _, issue := range allDriftiveOpenIssues {
-		if issue.Kind == ErrorIssueKind {
+		if issue.Kind == types.ErrorIssueKind {
 			numOpenErrorIssues++
 		}
 	}
 
-	var closeableDriftIssues []ProjectIssue
+	var closeableDriftIssues []types.ProjectIssue
 	for _, project := range allDriftiveOpenIssues {
-		if project.Kind == DriftIssueKind {
+		if project.Kind == types.DriftIssueKind {
 			for _, projectResult := range driftResult.ProjectResults {
 				if !projectResult.Drifted && project.Project.Dir == projectResult.Project.Dir {
 					closeableDriftIssues = append(closeableDriftIssues, project)
@@ -111,9 +153,9 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 		}
 	}
 
-	var closeableErrorIssues []ProjectIssue
+	var closeableErrorIssues []types.ProjectIssue
 	for _, project := range allDriftiveOpenIssues {
-		if project.Kind == ErrorIssueKind {
+		if project.Kind == types.ErrorIssueKind {
 			for _, projectResult := range driftResult.ProjectResults {
 				if projectResult.Succeeded && project.Project.Dir == projectResult.Project.Dir {
 					closeableErrorIssues = append(closeableErrorIssues, project)
@@ -125,7 +167,7 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 	closedDriftIssues := g.closeIssues(ctx, closeableDriftIssues)
 	log.Info().Msgf("Closed %d state-drifted issues", len(closedDriftIssues))
 	numOpenDriftIssues = numOpenDriftIssues - len(closedDriftIssues)
-	var newlyCreatedIssues []ProjectIssue
+	var newlyCreatedIssues []types.ProjectIssue
 	var rateLimitedProjectDirs []string
 
 	// Create issues for drifted projects
@@ -137,12 +179,12 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 				continue
 			}
 
-			issue := GithubIssue{
+			issue := types.GithubIssue{
 				Title:   fmt.Sprintf(issueTitleFormat, projectResult.Project.Dir),
 				Body:    *issueBody,
 				Labels:  g.repoConfig.GitHub.Issues.Labels,
 				Project: projectResult.Project,
-				Kind:    DriftIssueKind,
+				Kind:    types.DriftIssueKind,
 			}
 			createOrUpdateResult := g.CreateOrUpdateIssue(
 				ctx,
@@ -152,12 +194,12 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 			)
 			if createOrUpdateResult.Created {
 				numOpenDriftIssues++
-				newlyCreatedIssues = append(newlyCreatedIssues, ProjectIssue{
+				newlyCreatedIssues = append(newlyCreatedIssues, types.ProjectIssue{
 					Issue: *createOrUpdateResult.Issue,
 					Project: models.Project{
 						Dir: projectResult.Project.Dir,
 					},
-					Kind: DriftIssueKind,
+					Kind: types.DriftIssueKind,
 				})
 			}
 			if createOrUpdateResult.RateLimited {
@@ -180,12 +222,12 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 					continue
 				}
 
-				issue := GithubIssue{
+				issue := types.GithubIssue{
 					Title:   fmt.Sprintf(errorIssueTitleFormat, projectResult.Project.Dir),
 					Body:    *issueBody,
 					Labels:  g.repoConfig.GitHub.Issues.Errors.Labels,
 					Project: projectResult.Project,
-					Kind:    ErrorIssueKind,
+					Kind:    types.ErrorIssueKind,
 				}
 				createOrUpdateResult := g.CreateOrUpdateIssue(
 					ctx,
@@ -195,12 +237,12 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 				)
 				if createOrUpdateResult.Created {
 					numOpenErrorIssues++
-					newlyCreatedIssues = append(newlyCreatedIssues, ProjectIssue{
+					newlyCreatedIssues = append(newlyCreatedIssues, types.ProjectIssue{
 						Issue: *createOrUpdateResult.Issue,
 						Project: models.Project{
 							Dir: projectResult.Project.Dir,
 						},
-						Kind: ErrorIssueKind,
+						Kind: types.ErrorIssueKind,
 					})
 				}
 			}
@@ -208,20 +250,20 @@ func (g *GithubIssueNotification) Send(ctx context.Context, driftResult drift.Dr
 	}
 
 	currentOpenIssues := append(allDriftiveOpenIssues, newlyCreatedIssues...)
-	currentDriftedIssues := filterIssues(filterIssuesByKind(currentOpenIssues, DriftIssueKind), closedDriftIssues)
-	currentErroredIssues := filterIssues(filterIssuesByKind(currentOpenIssues, ErrorIssueKind), closedErrorIssues)
+	currentDriftedIssues := filterIssues(filterIssuesByKind(currentOpenIssues, types.DriftIssueKind), closedDriftIssues)
+	currentErroredIssues := filterIssues(filterIssuesByKind(currentOpenIssues, types.ErrorIssueKind), closedErrorIssues)
 
-	return &GithubState{
+	return &types.GithubState{
 		RateLimitedDrifts:   rateLimitedProjectDirs,
-		DriftIssuesOpen:     projectIssueListToProjectList(currentDriftedIssues),
-		DriftIssuesResolved: projectIssueListToProjectList(closedDriftIssues),
-		ErrorIssuesOpen:     projectIssueListToProjectList(currentErroredIssues),
-		ErrorIssuesResolved: projectIssueListToProjectList(closedErrorIssues),
+		DriftIssuesOpen:     currentDriftedIssues,
+		DriftIssuesResolved: closedDriftIssues,
+		ErrorIssuesOpen:     currentErroredIssues,
+		ErrorIssuesResolved: closedErrorIssues,
 	}, nil
 }
 
-func filterIssuesByKind(allIssues []ProjectIssue, kind IssueKind) []ProjectIssue {
-	var issues []ProjectIssue
+func filterIssuesByKind(allIssues []types.ProjectIssue, kind string) []types.ProjectIssue {
+	var issues []types.ProjectIssue
 	for _, issue := range allIssues {
 		if issue.Kind == kind {
 			issues = append(issues, issue)
@@ -230,13 +272,13 @@ func filterIssuesByKind(allIssues []ProjectIssue, kind IssueKind) []ProjectIssue
 	return issues
 }
 
-func projectIssueToProject(projectIssue ProjectIssue) models.Project {
+func projectIssueToProject(projectIssue types.ProjectIssue) models.Project {
 	return models.Project{
 		Dir: projectIssue.Project.Dir,
 	}
 }
 
-func projectIssueListToProjectList(projectIssues []ProjectIssue) []models.Project {
+func projectIssueListToProjectList(projectIssues []types.ProjectIssue) []models.Project {
 	projects := make([]models.Project, 0)
 	for _, projectIssue := range projectIssues {
 		projects = append(projects, projectIssueToProject(projectIssue))
@@ -245,8 +287,8 @@ func projectIssueListToProjectList(projectIssues []ProjectIssue) []models.Projec
 }
 
 // getProjectIssuesFromGHIssueBodies lists the issues that have any of the labels or the title contains the keyword
-func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []ProjectIssue {
-	issues := make([]ProjectIssue, 0)
+func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []types.ProjectIssue {
+	issues := make([]types.ProjectIssue, 0)
 	for _, issue := range ghIssues {
 		project, err := getProjectFromIssueBody(issue.GetBody())
 		if err != nil {
@@ -259,7 +301,7 @@ func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []ProjectIssue 
 			continue
 		}
 
-		issues = append(issues, ProjectIssue{
+		issues = append(issues, types.ProjectIssue{
 			Project: project.Project,
 			Issue:   *issue,
 			Kind:    project.Kind,
@@ -268,7 +310,7 @@ func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []ProjectIssue 
 	return issues
 }
 
-func getProjectFromIssueBody(body string) (*GHProject, error) {
+func getProjectFromIssueBody(body string) (*types.GHProject, error) {
 	idx := strings.Index(body, issueBodyProjectNameStartKeyword)
 	if idx == -1 {
 		return nil, errors.New("project name not found")
@@ -281,11 +323,28 @@ func getProjectFromIssueBody(body string) (*GHProject, error) {
 	// format: <!--folder/project_name-->
 	projectNameTag := body[idx : idx+endIdx]
 	projectJson := strings.ReplaceAll(strings.ReplaceAll(projectNameTag, "<!--", ""), "-->", "")
-	var project GHProject
+	var project types.GHProject
 	if err := json.Unmarshal([]byte(projectJson), &project); err != nil {
 		log.Warn().Msgf("Failed to find project details from issue body. %v. Ignoring issue.", err)
 		return nil, errors.New(ErrIssueMetadataNotFound)
 	}
 
 	return &project, nil
+}
+
+func (g *GithubIssueNotification) closeIssues(ctx context.Context, issues []types.ProjectIssue) []types.ProjectIssue {
+	if !g.repoConfig.GitHub.Issues.CloseResolved && len(issues) > 0 {
+		log.Warn().Msg("Note: There are GH drift issues but driftive is not configured to close them.")
+		return []types.ProjectIssue{}
+	}
+
+	var closedIssues []types.ProjectIssue
+	for _, projIssue := range issues {
+		closed := g.CloseIssue(ctx, projIssue)
+		if closed {
+			closedIssues = append(closedIssues, projIssue)
+		}
+	}
+
+	return closedIssues
 }

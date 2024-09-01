@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"driftive/pkg/drift"
+	"driftive/pkg/notification/github/types"
 	"fmt"
 	"github.com/google/go-github/v64/github"
 	"github.com/rs/zerolog/log"
@@ -18,7 +19,7 @@ type CreateOrUpdateResult struct {
 // CreateOrUpdateIssue creates a new issue if it doesn't exist, or updates the existing issue if it does. It returns true if a new issue was created.
 func (g *GithubIssueNotification) CreateOrUpdateIssue(
 	ctx context.Context,
-	driftiveIssue GithubIssue,
+	driftiveIssue types.GithubIssue,
 	openIssues []*github.Issue,
 	updateOnly bool) CreateOrUpdateResult {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
@@ -35,7 +36,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 		if issue.GetTitle() == driftiveIssue.Title {
 			if issue.GetBody() == driftiveIssue.Body {
 				log.Info().Msgf("Issue [%s] already exists for project %s (repo: %s/%s)",
-					IssueKindToString(driftiveIssue.Kind),
+					driftiveIssue.Kind,
 					driftiveIssue.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
@@ -64,7 +65,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 				}
 
 				log.Info().Msgf("Updated issue [%s] for project %s (repo: %s/%s)",
-					IssueKindToString(driftiveIssue.Kind),
+					driftiveIssue.Kind,
 					driftiveIssue.Project.Dir,
 					ownerRepo[0],
 					ownerRepo[1])
@@ -80,7 +81,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 
 	if updateOnly {
 		log.Warn().Msgf("Max number of open issues reached. Skipping issue [%s] creation for project %s (repo: %s/%s)",
-			IssueKindToString(driftiveIssue.Kind),
+			driftiveIssue.Kind,
 			driftiveIssue.Project.Dir,
 			ownerRepo[0],
 			ownerRepo[1])
@@ -103,7 +104,7 @@ func (g *GithubIssueNotification) CreateOrUpdateIssue(
 	}
 
 	log.Info().Msgf("Creating issue [%s] for project %s (repo: %s/%s)",
-		IssueKindToString(driftiveIssue.Kind),
+		driftiveIssue.Kind,
 		driftiveIssue.Project.Dir,
 		ownerRepo[0],
 		ownerRepo[1])
@@ -203,7 +204,7 @@ func (g *GithubIssueNotification) CloseIssueIfExists(openIssues []*github.Issue,
 	return false
 }
 
-func (g *GithubIssueNotification) CloseIssue(ctx context.Context, projectIssue ProjectIssue) bool {
+func (g *GithubIssueNotification) CloseIssue(ctx context.Context, projectIssue types.ProjectIssue) bool {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		log.Error().Msg("Invalid repository name")
@@ -211,7 +212,7 @@ func (g *GithubIssueNotification) CloseIssue(ctx context.Context, projectIssue P
 	}
 
 	log.Info().Msgf("Closing issue [%s] for project %s (repo: %s/%s)",
-		IssueKindToString(projectIssue.Kind),
+		projectIssue.Kind,
 		projectIssue.Project.Dir,
 		ownerRepo[0],
 		ownerRepo[1])
@@ -235,6 +236,6 @@ func (g *GithubIssueNotification) CloseIssue(ctx context.Context, projectIssue P
 		log.Error().Msgf("Failed to close issue. %v", err)
 		return false
 	}
-	log.Info().Msgf("Closed issue [%s] for project %s (repo: %s/%s)", IssueKindToString(projectIssue.Kind), projectIssue.Project.Dir, ownerRepo[0], ownerRepo[1])
+	log.Info().Msgf("Closed issue [%s] for project %s (repo: %s/%s)", projectIssue.Kind, projectIssue.Project.Dir, ownerRepo[0], ownerRepo[1])
 	return true
 }
