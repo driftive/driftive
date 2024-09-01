@@ -27,6 +27,7 @@ func ParseConfig() DriftiveConfig {
 	var logLevel string
 	var enableStdoutResult bool
 	var githubToken string
+	var exitCode bool
 
 	flag.StringVar(&repositoryPath, "repo-path", "", "Path to the repository. If provided, the repository will not be cloned.")
 	flag.StringVar(&repositoryUrl, "repo-url", "", "e.g. https://<token>@github.com/<org>/<repo>. If repo-path is provided, this is ignored.")
@@ -36,6 +37,7 @@ func ParseConfig() DriftiveConfig {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level. Options: trace, debug, info, warn, error, fatal, panic")
 	flag.BoolVar(&enableStdoutResult, "stdout", true, "Enable printing drift results to stdout")
 	flag.StringVar(&githubToken, "github-token", "", "Github token")
+	flag.BoolVar(&exitCode, "exit-code", false, "Exit with code 1 if drift is detected")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, branch)
@@ -58,5 +60,6 @@ func ParseConfig() DriftiveConfig {
 		SlackWebhookUrl:    slackWebhookUrl,
 		GithubToken:        githubToken,
 		GithubContext:      ghContext,
+		ExitCode:           exitCode,
 	}
 }

@@ -13,6 +13,7 @@ type DriftiveConfig struct {
 	Concurrency    int    `json:"concurrency" yaml:"concurrency"`
 
 	LogLevel string `json:"log_level" yaml:"log_level"`
+	ExitCode bool   `json:"exit_code" yaml:"exit_code"`
 
 	EnableStdoutResult bool   `json:"stdout_result" yaml:"stdout_result"`
 	SlackWebhookUrl    string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
