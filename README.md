@@ -63,6 +63,9 @@ It supports the following configuration options:
     * `pattern` - glob pattern to match the files
     * `executable` - executable to use for the files matching the pattern. Supported executables: `terraform`, `terragrunt`, `tofu`
 * `github` - GitHub configuration
+  * `summary` - create a summary issue
+    * `enabled` - enable summary issue. requires issues to be enabled.
+    * `issue_title` - title of the summary issue
   * `issues` - GitHub issues configuration
     * `enabled` - enable GitHub issues
     * `close_resolved` - close resolved issues
@@ -96,6 +99,9 @@ auto_discover:
       executable: "terraform"
 
 github:
+  summary:
+    enabled: true # create a summary issue. It requires issues to be enabled
+    issue_title: "Driftive Summary"
   issues:
     enabled: true # create issues for detected drifts
     close_resolved: true
