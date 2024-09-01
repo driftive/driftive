@@ -18,7 +18,7 @@ type Slack struct {
 	IssuesState *backend.DriftIssuesState
 }
 
-func (slack Slack) Send(ctx context.Context, driftResult drift.DriftDetectionResult) error {
+func (slack Slack) Handle(ctx context.Context, driftResult drift.DriftDetectionResult) error {
 	if driftResult.TotalDrifted == 0 && !didResolveIssues(slack.IssuesState) {
 		log.Info().Msg("No drift detected. Skipping slack notification")
 		return nil

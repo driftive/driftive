@@ -17,10 +17,6 @@ type NotificationHandler struct {
 	driftiveConfig *config.DriftiveConfig
 }
 
-type NotificationsResult struct {
-	Github *github.GithubState
-}
-
 func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) *NotificationHandler {
 	return &NotificationHandler{
 		repoConfig:     repoConfig,
@@ -39,17 +35,16 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 		log.Info().Msg("Updating Github issues...")
 		gh, err := github.NewGithubIssueNotification(h.driftiveConfig, h.repoConfig)
 		if err == nil {
-			ghResult, err := gh.Send(ctx, analysisResult)
+			_, err := gh.Handle(ctx, analysisResult)
 			if err != nil {
-				log.Error().Msgf("ErrorIssueKind updating Github issues. %v", err)
+				log.Error().Err(err).Msg("Failed to update github issues/summary")
 			}
-			log.Info().Msgf("Github issues updated. Result: %v", ghResult)
 		}
 	}
 
 	if h.driftiveConfig.EnableStdoutResult {
 		stdout := console.NewStdout()
-		err := stdout.Send(ctx, analysisResult)
+		err := stdout.Handle(ctx, analysisResult)
 		if err != nil {
 			log.Error().Msgf("Failed to print drifts to stdout. %v", err)
 		}
@@ -58,7 +53,7 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 	if h.driftiveConfig.SlackWebhookUrl != "" {
 		log.Info().Msg("Sending notification to slack...")
 		slackNotification := slack.Slack{Url: h.driftiveConfig.SlackWebhookUrl, IssuesState: issuesState}
-		err := slackNotification.Send(ctx, analysisResult)
+		err := slackNotification.Handle(ctx, analysisResult)
 		if err != nil {
 			log.Error().Msgf("Failed to send slack notification. %v", err)
 		}

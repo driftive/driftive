@@ -31,6 +31,10 @@ func loadRepoConfig(filePath string) (*repo.DriftiveRepoConfig, error) {
 		cfg.GitHub.Issues.Errors.MaxOpenIssues = 5
 	}
 
+	if cfg.GitHub.Summary.IssueTitle == "" {
+		cfg.GitHub.Summary.IssueTitle = "Driftive Summary"
+	}
+
 	return cfg, nil
 }
 

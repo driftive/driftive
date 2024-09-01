@@ -13,7 +13,7 @@ func NewStdout() Stdout {
 	return Stdout{}
 }
 
-func (s Stdout) Send(ctx context.Context, driftResult drift.DriftDetectionResult) error {
+func (s Stdout) Handle(ctx context.Context, driftResult drift.DriftDetectionResult) error {
 	if driftResult.TotalDrifted == 0 {
 		return nil
 	}

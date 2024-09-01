@@ -18,6 +18,8 @@ auto_discover:
       executable: "terraform"
 
 github:
+  summary:
+    enabled: true
   issues:
     enabled: true
     close_resolved: true
