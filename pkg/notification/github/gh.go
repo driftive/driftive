@@ -272,20 +272,6 @@ func filterIssuesByKind(allIssues []types.ProjectIssue, kind string) []types.Pro
 	return issues
 }
 
-func projectIssueToProject(projectIssue types.ProjectIssue) models.Project {
-	return models.Project{
-		Dir: projectIssue.Project.Dir,
-	}
-}
-
-func projectIssueListToProjectList(projectIssues []types.ProjectIssue) []models.Project {
-	projects := make([]models.Project, 0)
-	for _, projectIssue := range projectIssues {
-		projects = append(projects, projectIssueToProject(projectIssue))
-	}
-	return projects
-}
-
 // getProjectIssuesFromGHIssueBodies lists the issues that have any of the labels or the title contains the keyword
 func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []types.ProjectIssue {
 	issues := make([]types.ProjectIssue, 0)
