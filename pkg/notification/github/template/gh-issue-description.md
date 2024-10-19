@@ -1,4 +1,4 @@
-State drift in project: {{ .ProjectDir }}
+State drift in project: `{{ .ProjectDir }}`
 
 <details>
 <summary>Output</summary>
