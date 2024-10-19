@@ -4,7 +4,7 @@ import (
 	"driftive/pkg/models"
 	"driftive/pkg/notification/github/types"
 	_ "embed"
-	"github.com/google/go-github/v64/github"
+	"github.com/google/go-github/v66/github"
 	"strings"
 	"testing"
 )
