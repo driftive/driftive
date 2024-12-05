@@ -9,7 +9,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v67/github"
 	"github.com/rs/zerolog/log"
 	"strings"
 	"text/template"
