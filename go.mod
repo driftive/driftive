@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/google/go-github/v67 v67.0.0
+	github.com/google/go-github/v69 v69.2.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/rs/zerolog v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
