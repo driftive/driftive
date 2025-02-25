@@ -6,6 +6,7 @@ import (
 	"flag"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"os"
 	"strings"
 )
 
@@ -18,6 +19,14 @@ func validateArgs(repositoryUrl, repositoryPath, branch string) {
 	}
 }
 
+func parseDriftiveToken() string {
+	token := os.Getenv("DRIFTIVE_TOKEN")
+	if token == "" {
+		return ""
+	}
+	return token
+}
+
 func ParseConfig() DriftiveConfig {
 	var repositoryUrl string
 	var slackWebhookUrl string
@@ -27,6 +36,7 @@ func ParseConfig() DriftiveConfig {
 	var logLevel string
 	var enableStdoutResult bool
 	var githubToken string
+	var driftiveApiUrl string
 	var exitCode bool
 
 	flag.StringVar(&repositoryPath, "repo-path", "", "Path to the repository. If provided, the repository will not be cloned.")
@@ -38,6 +48,7 @@ func ParseConfig() DriftiveConfig {
 	flag.BoolVar(&enableStdoutResult, "stdout", true, "Enable printing drift results to stdout")
 	flag.StringVar(&githubToken, "github-token", "", "Github token")
 	flag.BoolVar(&exitCode, "exit-code", false, "Exit with code 1 if any state drift is detected")
+	flag.StringVar(&driftiveApiUrl, "api-url", "https://driftive.cloud", "Driftive API URL")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, branch)
@@ -45,10 +56,11 @@ func ParseConfig() DriftiveConfig {
 	zerolog.SetGlobalLevel(utils.ParseLogLevel(logLevel))
 
 	ghContext, err := gh.ParseGHActionContextEnvVar()
-
 	if err != nil {
 		log.Warn().Msgf("Failed to parse github action context. %v", err)
 	}
+
+	driftiveToken := parseDriftiveToken()
 
 	return DriftiveConfig{
 		RepositoryUrl:      repositoryUrl,
@@ -61,5 +73,7 @@ func ParseConfig() DriftiveConfig {
 		GithubToken:        githubToken,
 		GithubContext:      ghContext,
 		ExitCode:           exitCode,
+		DriftiveApiUrl:     driftiveApiUrl,
+		DriftiveToken:      driftiveToken,
 	}
 }

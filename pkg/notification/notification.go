@@ -7,6 +7,7 @@ import (
 	"driftive/pkg/drift"
 	"driftive/pkg/models/backend"
 	"driftive/pkg/notification/console"
+	"driftive/pkg/notification/driftive"
 	"driftive/pkg/notification/github"
 	"driftive/pkg/notification/slack"
 	"github.com/rs/zerolog/log"
@@ -56,6 +57,15 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 		err := slackNotification.Handle(ctx, analysisResult)
 		if err != nil {
 			log.Error().Msgf("Failed to send slack notification. %v", err)
+		}
+	}
+
+	if h.driftiveConfig.DriftiveToken != "" && h.driftiveConfig.DriftiveApiUrl != "" {
+		log.Info().Msg("Sending notification to driftive api...")
+		driftiveApiNotification := driftive.NewDriftiveNotification(h.driftiveConfig.DriftiveApiUrl, h.driftiveConfig.DriftiveToken)
+		err := driftiveApiNotification.Handle(ctx, analysisResult)
+		if err != nil {
+			log.Error().Msgf("Failed to analysis result to driftive api. %v", err)
 		}
 	}
 }
