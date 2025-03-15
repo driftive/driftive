@@ -19,6 +19,9 @@ type DriftiveConfig struct {
 	SlackWebhookUrl    string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
 	GithubToken        string `json:"github_token" yaml:"github_token"`
 	GithubContext      *gh.GithubActionContext
+
+	DriftiveApiUrl string `json:"api_url" yaml:"api_url"`
+	DriftiveToken  string `json:"token" yaml:"token"`
 }
 
 // DriftAnalysisConfig is the configuration for drift analysis
