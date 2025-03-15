@@ -20,7 +20,6 @@ func NewDriftiveNotification(url, token string) Driftive {
 }
 
 func (d Driftive) Handle(ctx context.Context, driftResult drift.DriftDetectionResult) error {
-
 	client := resty.New()
 	defer client.Close()
 
