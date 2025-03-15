@@ -179,7 +179,7 @@ func (g *GithubIssueNotification) CloseIssueIfExists(openIssues []*github.Issue,
 				ownerRepo[1])
 
 			if _, _, err := g.ghClient.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], issue.GetNumber(), &github.IssueComment{
-				Body: github.String("Issue has been resolved."),
+				Body: github.Ptr("Issue has been resolved."),
 			}); err != nil {
 				log.Error().Msgf("Failed to comment on issue. %v", err)
 			}
@@ -190,7 +190,7 @@ func (g *GithubIssueNotification) CloseIssueIfExists(openIssues []*github.Issue,
 				ownerRepo[1],
 				issue.GetNumber(),
 				&github.IssueRequest{
-					State: github.String("closed"),
+					State: github.Ptr("closed"),
 				})
 
 			if err != nil {
@@ -218,7 +218,7 @@ func (g *GithubIssueNotification) CloseIssue(ctx context.Context, projectIssue t
 		ownerRepo[1])
 
 	if _, _, err := g.ghClient.Issues.CreateComment(ctx, ownerRepo[0], ownerRepo[1], projectIssue.Issue.GetNumber(), &github.IssueComment{
-		Body: github.String("Issue has been resolved."),
+		Body: github.Ptr("Issue has been resolved."),
 	}); err != nil {
 		log.Error().Msgf("Failed to comment on issue. %v", err)
 	}
@@ -229,7 +229,7 @@ func (g *GithubIssueNotification) CloseIssue(ctx context.Context, projectIssue t
 		ownerRepo[1],
 		projectIssue.Issue.GetNumber(),
 		&github.IssueRequest{
-			State: github.String("closed"),
+			State: github.Ptr("closed"),
 		})
 
 	if err != nil {
