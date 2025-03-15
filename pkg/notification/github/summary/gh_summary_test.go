@@ -4,7 +4,7 @@ import (
 	"driftive/pkg/models"
 	"driftive/pkg/notification/github/types"
 	_ "embed"
-	"github.com/google/go-github/v67/github"
+	"github.com/google/go-github/v69/github"
 	"strings"
 	"testing"
 )
@@ -19,7 +19,7 @@ func TestGetSummaryIssueBody(t *testing.T) {
 				Dir: "projs/project1",
 			},
 			Issue: github.Issue{
-				Number: github.Int(1),
+				Number: github.Ptr(1),
 			},
 			Kind: "drift",
 		}, {
@@ -27,7 +27,7 @@ func TestGetSummaryIssueBody(t *testing.T) {
 				Dir: "projs/project2",
 			},
 			Issue: github.Issue{
-				Number: github.Int(2),
+				Number: github.Ptr(2),
 			},
 			Kind: "drift",
 		}},
@@ -36,7 +36,7 @@ func TestGetSummaryIssueBody(t *testing.T) {
 				Dir: "projs/project3",
 			},
 			Issue: github.Issue{
-				Number: github.Int(3),
+				Number: github.Ptr(3),
 			},
 			Kind: "drift",
 		}},
