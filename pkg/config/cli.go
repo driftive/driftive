@@ -48,7 +48,7 @@ func ParseConfig() DriftiveConfig {
 	flag.BoolVar(&enableStdoutResult, "stdout", true, "Enable printing drift results to stdout")
 	flag.StringVar(&githubToken, "github-token", "", "Github token")
 	flag.BoolVar(&exitCode, "exit-code", false, "Exit with code 1 if any state drift is detected")
-	flag.StringVar(&driftiveApiUrl, "api-url", "https://driftive.cloud", "Driftive API URL")
+	flag.StringVar(&driftiveApiUrl, "api-url", "https://api.driftive.cloud", "Driftive API URL")
 	flag.Parse()
 
 	validateArgs(repositoryUrl, repositoryPath, branch)
