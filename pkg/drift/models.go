@@ -17,20 +17,20 @@ type DriftDetector struct {
 }
 
 type DriftProjectResult struct {
-	Project models.TypedProject
-	Drifted bool
+	Project models.TypedProject `json:"project"`
+	Drifted bool                `json:"drifted"`
 	// Succeeded true if the drift analysis succeeded, even if the project had drifted.
-	Succeeded  bool
-	InitOutput string
-	PlanOutput string
+	Succeeded  bool   `json:"succeeded"`
+	InitOutput string `json:"init_output"`
+	PlanOutput string `json:"plan_output"`
 }
 
 type DriftDetectionResult struct {
-	ProjectResults []DriftProjectResult
-	TotalDrifted   int
-	TotalProjects  int
-	TotalChecked   int
-	Duration       time.Duration
+	ProjectResults []DriftProjectResult `json:"project_results"`
+	TotalDrifted   int                  `json:"total_drifted"`
+	TotalProjects  int                  `json:"total_projects"`
+	TotalChecked   int                  `json:"total_checked"`
+	Duration       time.Duration        `json:"duration"`
 }
 
 func NewDriftDetector(repoDir string, projects []models.TypedProject, concurrency int) DriftDetector {
