@@ -25,6 +25,8 @@ type DriftiveRepoConfigGitHubIssues struct {
 	Labels []string `json:"labels" yaml:"labels"`
 	// MaxOpenIssues is the maximum number of open issues to have at any time
 	MaxOpenIssues int `json:"max_open_issues" yaml:"max_open_issues"`
+	// SkipIfOpenPR is used to skip drift notifications if there are open PRs modifying the drifted files
+	SkipIfOpenPR bool `json:"skip_if_open_pr" yaml:"skip_if_open_pr"`
 	// Errors is used to configure error handling for GitHub issues
 	Errors DriftiveRepoConfigGitHubIssuesErrors `json:"errors" yaml:"errors"`
 }

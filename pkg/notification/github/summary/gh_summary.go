@@ -6,6 +6,7 @@ import (
 	"driftive/pkg/config"
 	"driftive/pkg/config/repo"
 	driftiveGithub "driftive/pkg/notification/github/types"
+	"driftive/pkg/vcs/vcstypes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -30,13 +31,13 @@ type GithubSummaryHandler struct {
 	repoConfig    *repo.DriftiveRepoConfig
 	config        *config.DriftiveConfig
 	ghClient      *github.Client
-	allOpenIssues []*github.Issue
+	allOpenIssues []*vcstypes.VCSIssue
 }
 
 func NewGithubSummaryHandler(
 	config *config.DriftiveConfig,
 	repoConfig *repo.DriftiveRepoConfig,
-	allOpenIssues []*github.Issue) *GithubSummaryHandler {
+	allOpenIssues []*vcstypes.VCSIssue) *GithubSummaryHandler {
 	ghClient := github.NewClient(nil).WithAuthToken(config.GithubToken)
 	return &GithubSummaryHandler{
 		config:        config,
