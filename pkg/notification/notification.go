@@ -10,18 +10,21 @@ import (
 	"driftive/pkg/notification/driftive"
 	"driftive/pkg/notification/github"
 	"driftive/pkg/notification/slack"
+	"driftive/pkg/vcs"
 	"github.com/rs/zerolog/log"
 )
 
 type NotificationHandler struct {
 	repoConfig     *repo.DriftiveRepoConfig
 	driftiveConfig *config.DriftiveConfig
+	vcs            vcs.VCS
 }
 
-func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) *NotificationHandler {
+func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig, vcs vcs.VCS) *NotificationHandler {
 	return &NotificationHandler{
 		repoConfig:     repoConfig,
 		driftiveConfig: driftiveConfig,
+		vcs:            vcs,
 	}
 }
 
@@ -34,7 +37,7 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 	if h.repoConfig.GitHub.Issues.Enabled && h.driftiveConfig.GithubToken != "" && h.driftiveConfig.GithubContext != nil {
 		var err error
 		log.Info().Msg("Updating Github issues...")
-		gh, err := github.NewGithubIssueNotification(h.driftiveConfig, h.repoConfig)
+		gh, err := github.NewGithubIssueNotification(h.driftiveConfig, h.repoConfig, h.vcs)
 		if err == nil {
 			_, err := gh.Handle(ctx, analysisResult)
 			if err != nil {

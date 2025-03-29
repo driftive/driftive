@@ -10,14 +10,18 @@ import (
 	"driftive/pkg/notification/github/summary"
 	"driftive/pkg/notification/github/types"
 	"driftive/pkg/utils"
+	"driftive/pkg/utils/ghutils"
+	"driftive/pkg/vcs"
+	"driftive/pkg/vcs/vcstypes"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/go-github/v69/github"
-	"github.com/rs/zerolog/log"
 	"strings"
 	"text/template"
+
+	"github.com/google/go-github/v69/github"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -25,7 +29,6 @@ const (
 	errorIssueTitleFormat            = "plan error: %s"
 	maxIssueBodySize                 = 64000 // Lower than 65535 to account for other metadata
 	ErrRepoNotProvided               = "repository or owner not provided"
-	ErrGHTokenNotProvided            = "github token not provided"
 	issueBodyProjectNameStartKeyword = "<!--PROJECT_JSON_START-->"
 	issueBodyProjectNameEndKeyword   = "<!--PROJECT_JSON_END-->"
 	ErrIssueMetadataNotFound         = "issue_metadata_not_found"
@@ -41,21 +44,21 @@ type GithubIssueNotification struct {
 	config     *config.DriftiveConfig
 	repoConfig *repo.DriftiveRepoConfig
 	ghClient   *github.Client
+	scm        vcs.VCS
 }
 
-func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) (*GithubIssueNotification, error) {
+func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig, ghOpts vcs.VCS) (*GithubIssueNotification, error) {
 	if config.GithubContext.Repository == "" || config.GithubContext.RepositoryOwner == "" {
 		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
 		return nil, errors.New(ErrRepoNotProvided)
 	}
 
-	if config.GithubToken == "" {
+	ghClient, err := ghutils.GitHubClient(config.GithubToken)
+	if err != nil {
 		log.Warn().Msg("Github token not provided. Skipping github notification")
-		return nil, errors.New(ErrGHTokenNotProvided)
+		return nil, err
 	}
-
-	ghClient := github.NewClient(nil).WithAuthToken(config.GithubToken)
-	return &GithubIssueNotification{config: config, repoConfig: repoConfig, ghClient: ghClient}, nil
+	return &GithubIssueNotification{config: config, repoConfig: repoConfig, ghClient: ghClient, scm: ghOpts}, nil
 }
 
 func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate string) (*string, error) {
@@ -103,7 +106,7 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate stri
 }
 
 func (g *GithubIssueNotification) Handle(ctx context.Context, analysisResult drift.DriftDetectionResult) (*types.GithubState, error) {
-	allOpenIssues, err := g.GetAllOpenRepoIssues(ctx)
+	allOpenIssues, err := g.scm.GetAllOpenRepoIssues(ctx)
 	if err != nil {
 		log.Error().Msgf("Failed to get open issues. %v", err)
 		return nil, err
@@ -127,7 +130,7 @@ func (g *GithubIssueNotification) Handle(ctx context.Context, analysisResult dri
 
 func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 	driftResult drift.DriftDetectionResult,
-	allOpenIssues []*github.Issue) (*types.GithubState, error) {
+	allOpenIssues []*vcstypes.VCSIssue) (*types.GithubState, error) {
 	allDriftiveOpenIssues := getProjectIssuesFromGHIssueBodies(allOpenIssues)
 	numOpenDriftIssues := 0
 	for _, issue := range allDriftiveOpenIssues {
@@ -172,7 +175,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 
 	// Create issues for drifted projects
 	for _, projectResult := range driftResult.ProjectResults {
-		if projectResult.Drifted {
+		if projectResult.Drifted && !projectResult.SkippedDueToPR {
 			issueBody, err := parseGithubBodyTemplate(projectResult, issueBodyTemplate)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to parse github issue description template")
@@ -186,7 +189,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 				Project: projectResult.Project,
 				Kind:    types.DriftIssueKind,
 			}
-			createOrUpdateResult := g.CreateOrUpdateIssue(
+			createOrUpdateResult := g.scm.CreateOrUpdateIssue(
 				ctx,
 				issue,
 				allOpenIssues,
@@ -205,6 +208,8 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 			if createOrUpdateResult.RateLimited {
 				rateLimitedProjectDirs = append(rateLimitedProjectDirs, projectResult.Project.Dir)
 			}
+		} else if projectResult.Drifted && projectResult.SkippedDueToPR {
+			log.Info().Msgf("Skipping drift notification for %s due to open PRs", projectResult.Project.Dir)
 		}
 	}
 
@@ -229,7 +234,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 					Project: projectResult.Project,
 					Kind:    types.ErrorIssueKind,
 				}
-				createOrUpdateResult := g.CreateOrUpdateIssue(
+				createOrUpdateResult := g.scm.CreateOrUpdateIssue(
 					ctx,
 					issue,
 					allOpenIssues,
@@ -273,17 +278,17 @@ func filterIssuesByKind(allIssues []types.ProjectIssue, kind string) []types.Pro
 }
 
 // getProjectIssuesFromGHIssueBodies lists the issues that have any of the labels or the title contains the keyword
-func getProjectIssuesFromGHIssueBodies(ghIssues []*github.Issue) []types.ProjectIssue {
+func getProjectIssuesFromGHIssueBodies(ghIssues []*vcstypes.VCSIssue) []types.ProjectIssue {
 	issues := make([]types.ProjectIssue, 0)
 	for _, issue := range ghIssues {
-		project, err := getProjectFromIssueBody(issue.GetBody())
+		project, err := getProjectFromIssueBody(issue.Body)
 		if err != nil {
-			log.Warn().Err(err).Msgf("Failed to get project name from issue metadata. Issue title: %s", issue.GetTitle())
+			log.Warn().Err(err).Msgf("Failed to get project name from issue metadata. Issue title: %s", issue.Title)
 			continue
 		}
 
 		if project == nil {
-			log.Debug().Msgf("Project not found in issue metadata. Issue: %s", issue.GetTitle())
+			log.Debug().Msgf("Project not found in issue metadata. Issue: %s", issue.Title)
 			continue
 		}
 

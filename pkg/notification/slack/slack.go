@@ -8,9 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"io"
 	"net/http"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Slack struct {
@@ -19,24 +20,32 @@ type Slack struct {
 }
 
 func (slack Slack) Handle(ctx context.Context, driftResult drift.DriftDetectionResult) error {
-	if driftResult.TotalDrifted == 0 && !didResolveIssues(slack.IssuesState) {
+	// Count only non-skipped drifts
+	nonSkippedDrifts := 0
+	for _, project := range driftResult.ProjectResults {
+		if project.Drifted && !project.SkippedDueToPR {
+			nonSkippedDrifts++
+		}
+	}
+
+	if nonSkippedDrifts == 0 && !didResolveIssues(slack.IssuesState) {
 		log.Info().Msg("No drift detected. Skipping slack notification")
 		return nil
 	}
 
 	httpClient := &http.Client{}
 	message := ":bangbang: State Drift detected in projects\n"
-	message += fmt.Sprintf(":gear: Drifts `%d`/`%d`\n", driftResult.TotalDrifted, driftResult.TotalProjects)
+	message += fmt.Sprintf(":gear: Drifts `%d`/`%d`\n", nonSkippedDrifts, driftResult.TotalProjects)
 	message += fmt.Sprintf(":clock1: Analysis duration `%s`\n", driftResult.Duration.String())
 
 	if slack.IssuesState != nil && slack.IssuesState.StateUpdated && slack.IssuesState.NumResolvedIssues > 0 {
 		message += fmt.Sprintf(":white_check_mark: Resolved issues since last analysis `%d`\n", slack.IssuesState.NumResolvedIssues)
 	}
 
-	if driftResult.TotalDrifted > 0 {
+	if nonSkippedDrifts > 0 {
 		message += ":point_down: Projects with state drifts \n\n```"
 		for _, project := range driftResult.ProjectResults {
-			if project.Drifted {
+			if project.Drifted && !project.SkippedDueToPR {
 				message += fmt.Sprintf("%s\n", project.Project.Dir)
 			}
 		}
