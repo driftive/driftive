@@ -40,7 +40,7 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 	startTime := time.Now()
 
 	for idx, proj := range d.Projects {
-		projectDir := strings.TrimPrefix(strings.Replace(proj.Dir, d.RepoDir, "", -1), utils.PathSeparator)
+		projectDir := strings.TrimPrefix(strings.ReplaceAll(proj.Dir, d.RepoDir, ""), utils.PathSeparator)
 
 		if projectDir == "" {
 			continue

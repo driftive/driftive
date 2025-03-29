@@ -11,10 +11,10 @@ import (
 )
 
 func (g *GHOps) toSCMIssues(issues []*github.Issue) []*vcstypes.VCSIssue {
-	if issues == nil || len(issues) == 0 {
+	if len(issues) == 0 {
 		return make([]*vcstypes.VCSIssue, 0)
 	}
-	var scmIssues []*vcstypes.VCSIssue
+	scmIssues := make([]*vcstypes.VCSIssue, 0)
 	for _, issue := range issues {
 		scmIssues = append(scmIssues, g.toSCMIssue(issue))
 	}

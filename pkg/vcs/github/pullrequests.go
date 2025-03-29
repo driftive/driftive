@@ -68,9 +68,7 @@ func (g *GHOps) GetChangedFilesForAllPRs(ctx context.Context) ([]string, error) 
 			log.Error().Msgf("Failed to get changed files for PR %d: %v", pr.Number, err)
 			continue
 		}
-		for _, file := range files {
-			changedFiles = append(changedFiles, file)
-		}
+		changedFiles = append(changedFiles, files...)
 	}
 	return changedFiles, nil
 }

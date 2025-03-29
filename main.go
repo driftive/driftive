@@ -40,7 +40,7 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 
 type ChangedFile = string
 
-func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg config.DriftiveConfig) ([]*vcstypes.VCSIssue, []ChangedFile, error) {
+func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg config.DriftiveConfig) ([]*vcstypes.VCSIssue, []ChangedFile) {
 	var allOpenIssues []*vcstypes.VCSIssue
 	var changedFiles []ChangedFile
 	if cfg.GithubContext.IsValid() && cfg.GithubToken != "" {
@@ -58,7 +58,7 @@ func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg config.DriftiveConfig
 		changedFiles = files
 	}
 
-	return allOpenIssues, changedFiles, nil
+	return allOpenIssues, changedFiles
 }
 
 func main() {
@@ -85,7 +85,7 @@ func main() {
 	}
 	scmOps, err := vcs.NewVCS(&cfg, repoConfig)
 
-	openIssues, changedFiles, err := prepareStash(ctx, scmOps, cfg)
+	openIssues, changedFiles := prepareStash(ctx, scmOps, cfg)
 	if err != nil {
 		log.Fatal().Msgf("Failed to prepare stash. %v", err)
 	}
