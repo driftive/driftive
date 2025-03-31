@@ -19,12 +19,12 @@ func removeTrailingSlash(path string) string {
 	return path
 }
 
+// /<repoPath>/path/to/file.txt -> path/to/file.txt
 func removeRepoDirPrefix(repoPath string, fullFilePath string) string {
-	// Remove the repoPath prefix from the fullFilePath
-	if len(repoPath) > 0 {
-		return fullFilePath[len(repoPath)+1:]
+	if len(repoPath) > 0 && repoPath[len(repoPath)-1] == os.PathSeparator {
+		repoPath = repoPath[:len(repoPath)-1]
 	}
-	return fullFilePath
+	return fullFilePath[len(repoPath)+1:]
 }
 
 func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetectionResult) {
@@ -36,7 +36,10 @@ func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetec
 					return
 				}
 				for _, file := range d.Stash.OpenPRChangedFiles {
-					if removeTrailingSlash(getFolder(file)) == removeTrailingSlash(removeRepoDirPrefix(d.Config.RepositoryPath, projectResult.Project.Dir)) {
+					fileFolder := removeTrailingSlash(getFolder(file))
+					projectFolder := removeTrailingSlash(removeRepoDirPrefix(d.Config.RepositoryPath, projectResult.Project.Dir))
+
+					if fileFolder == projectFolder {
 						projectResult.SkippedDueToPR = true
 						analysisResult.TotalDrifted--
 						log.Warn().Msgf("Marking project %s as skipped due to open PR", projectResult.Project.Dir)
