@@ -9,11 +9,9 @@ import (
 )
 
 func makeMockedResult(total, drifted int) DriftDetectionResult {
-
 	projs := make([]DriftProjectResult, 0)
 
 	for i := 0; i < total; i++ {
-
 		var isDrifted bool
 		if i < drifted {
 			isDrifted = true
