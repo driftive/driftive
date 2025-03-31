@@ -33,6 +33,7 @@ func (g *GHOps) toSCMIssue(issue *github.Issue) *vcstypes.VCSIssue {
 }
 
 func (g *GHOps) GetAllOpenRepoIssues(ctx context.Context) ([]*vcstypes.VCSIssue, error) {
+	log.Info().Msg("Fetching all open issues from the repository...")
 	var openIssues []*github.Issue
 	opt := &github.IssueListByRepoOptions{
 		State: "open",
@@ -66,7 +67,9 @@ func (g *GHOps) GetAllOpenRepoIssues(ctx context.Context) ([]*vcstypes.VCSIssue,
 		opt.Page = resp.NextPage
 	}
 
-	return g.toSCMIssues(openIssues), nil
+	issues := g.toSCMIssues(openIssues)
+	log.Info().Msgf("Fetched %d open issues from the repository", len(issues))
+	return issues, nil
 }
 
 // CreateOrUpdateIssue creates a new issue if it doesn't exist, or updates the existing issue if it does. It returns true if a new issue was created.
@@ -176,4 +179,41 @@ func (g *GHOps) CreateOrUpdateIssue(
 		RateLimited: false,
 		Issue:       g.toSCMIssue(createdIssue),
 	}
+}
+
+func (g *GHOps) CreateIssueComment(
+	ctx context.Context,
+	issueNumber int,
+) error {
+	owner := g.config.GithubContext.RepositoryOwner
+	repo := g.config.GithubContext.GetRepositoryName()
+	_, resp, err := g.ghClient.Issues.CreateComment(ctx, owner, repo, issueNumber, &github.IssueComment{
+		Body: github.Ptr("Issue has been resolved."),
+	})
+	if err != nil {
+		log.Error().Msgf("Failed to comment on issue. %v", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+func (g *GHOps) CloseIssue(ctx context.Context, issueNumber int) error {
+	owner := g.config.GithubContext.RepositoryOwner
+	repo := g.config.GithubContext.GetRepositoryName()
+	_, issueEditResp, err := g.ghClient.Issues.Edit(
+		ctx,
+		owner,
+		repo,
+		issueNumber,
+		&github.IssueRequest{
+			State: github.Ptr("closed"),
+		})
+	if err != nil {
+		log.Error().Msgf("Failed to close issue. %v", err)
+		return err
+	}
+	defer issueEditResp.Body.Close()
+	return nil
 }

@@ -73,7 +73,9 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 		Duration:       time.Since(startTime),
 	}
 
-	d.handleSkipIfContainsPRChanges(&result)
+	if d.RepoConfig.Settings.SkipIfOpenPR {
+		d.handleSkipIfContainsPRChanges(&result)
+	}
 
 	return result
 }

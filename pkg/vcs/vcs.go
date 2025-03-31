@@ -18,6 +18,8 @@ type VCS interface {
 	GetChangedFilesForAllPRs(ctx context.Context) ([]string, error)
 	CreateOrUpdateIssue(ctx context.Context, driftiveIssue types.GithubIssue,
 		openIssues []*vcstypes.VCSIssue, updateOnly bool) vcstypes.CreateOrUpdateResult
+	CreateIssueComment(ctx context.Context, issueNumber int) error
+	CloseIssue(ctx context.Context, issueNumber int) error
 }
 
 func NewVCS(cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) (VCS, error) {

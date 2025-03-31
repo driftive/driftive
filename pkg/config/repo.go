@@ -17,7 +17,11 @@ func loadRepoConfig(filePath string) (*repo.DriftiveRepoConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg := &repo.DriftiveRepoConfig{}
+	cfg := &repo.DriftiveRepoConfig{
+		Settings: repo.DriftiveRepoConfigSettings{
+			SkipIfOpenPR: true,
+		},
+	}
 	err = yaml.Unmarshal(fileContent, cfg)
 	if err != nil {
 		return nil, err
@@ -77,6 +81,9 @@ func DefaultRepoConfig() *repo.DriftiveRepoConfig {
 					Pattern:    "*.tf",
 					Executable: "terraform",
 				}},
+		},
+		Settings: repo.DriftiveRepoConfigSettings{
+			SkipIfOpenPR: true,
 		},
 	}
 }

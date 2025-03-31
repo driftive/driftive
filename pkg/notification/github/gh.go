@@ -331,7 +331,7 @@ func (g *GithubIssueNotification) closeIssues(ctx context.Context, issues []type
 
 	var closedIssues []types.ProjectIssue
 	for _, projIssue := range issues {
-		closed := g.CloseIssue(ctx, projIssue)
+		closed := g.CloseIssueWithComment(ctx, projIssue)
 		if closed {
 			closedIssues = append(closedIssues, projIssue)
 		}

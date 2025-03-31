@@ -40,9 +40,9 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 
 type ChangedFile = string
 
-func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg config.DriftiveConfig) ([]*vcstypes.VCSIssue, []ChangedFile) {
+func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) ([]*vcstypes.VCSIssue, []ChangedFile) {
 	var allOpenIssues []*vcstypes.VCSIssue
-	var changedFiles []ChangedFile
+	changedFiles := make([]ChangedFile, 0)
 	if cfg.GithubContext.IsValid() && cfg.GithubToken != "" {
 		log.Info().Msg("Github context detected.")
 		issues, err := scmOps.GetAllOpenRepoIssues(ctx)
@@ -51,11 +51,15 @@ func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg config.DriftiveConfig
 		}
 		allOpenIssues = issues
 
-		files, err := scmOps.GetChangedFilesForAllPRs(ctx)
-		if err != nil {
-			log.Fatal().Msgf("Failed to get changed files for open PRs: %v", err)
+		if repoConfig.Settings.SkipIfOpenPR {
+			files, err := scmOps.GetChangedFilesForAllPRs(ctx)
+			if err != nil {
+				log.Fatal().Msgf("Failed to get changed files for open PRs: %v", err)
+			}
+			changedFiles = files
+		} else {
+			log.Info().Msg("Not checking for changed files in open PRs because skip_if_open_pr is not enabled.")
 		}
-		changedFiles = files
 	}
 
 	return allOpenIssues, changedFiles
@@ -83,19 +87,19 @@ func main() {
 	if err != nil {
 		log.Fatal().Msgf("Failed to create GitHub client: %v", err)
 	}
-	scmOps, err := vcs.NewVCS(&cfg, repoConfig)
+	scmOps, err := vcs.NewVCS(cfg, repoConfig)
 
-	openIssues, changedFiles := prepareStash(ctx, scmOps, cfg)
+	openIssues, changedFiles := prepareStash(ctx, scmOps, cfg, repoConfig)
 	if err != nil {
 		log.Fatal().Msgf("Failed to prepare stash. %v", err)
 	}
 
 	projects := discover.AutoDiscoverProjects(repoDir, repoConfig)
 	log.Info().Msgf("Projects detected: %d", len(projects))
-	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg, openIssues, changedFiles)
+	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg, repoConfig, openIssues, changedFiles)
 	analysisResult := driftDetector.DetectDrift(ctx)
 
-	notification.NewNotificationHandler(&cfg, repoConfig, scmOps).
+	notification.NewNotificationHandler(cfg, repoConfig, scmOps).
 		HandleNotifications(ctx, analysisResult)
 
 	if analysisResult.TotalDrifted <= 0 {
@@ -121,7 +125,7 @@ func parseOnOff(enabled bool) string {
 	return "off"
 }
 
-func showInitMessage(cfg config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
+func showInitMessage(cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
 	log.Info().Msg("Starting driftive...")
 	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s. close resolved issues: %s. max opened issues: %d",
 		cfg.Concurrency,

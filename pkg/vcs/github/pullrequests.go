@@ -19,6 +19,7 @@ type PullRequest struct {
 }
 
 func (g *GHOps) GetAllOpenPRs(ctx context.Context) ([]PullRequest, error) {
+	log.Info().Msg("Fetching all open pull requests from the repository...")
 	opts := &github.PullRequestListOptions{
 		State: "open",
 		ListOptions: github.ListOptions{
@@ -53,10 +54,12 @@ func (g *GHOps) GetAllOpenPRs(ctx context.Context) ([]PullRequest, error) {
 		opts.Page = resp.NextPage
 	}
 
+	log.Info().Msgf("Fetched %d open pull requests", len(allPRs))
 	return allPRs, nil
 }
 
 func (g *GHOps) GetChangedFilesForAllPRs(ctx context.Context) ([]string, error) {
+	log.Info().Msg("Fetching changed files for all open pull requests...")
 	allPrs, err := g.GetAllOpenPRs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all open PRs: %w", err)
@@ -70,6 +73,7 @@ func (g *GHOps) GetChangedFilesForAllPRs(ctx context.Context) ([]string, error) 
 		}
 		changedFiles = append(changedFiles, files...)
 	}
+	log.Info().Msgf("Found %d changed files", len(changedFiles))
 	return changedFiles, nil
 }
 

@@ -2,6 +2,7 @@ package drift
 
 import (
 	"driftive/pkg/config"
+	"driftive/pkg/config/repo"
 	"driftive/pkg/models"
 	"driftive/pkg/utils"
 	"driftive/pkg/vcs/vcstypes"
@@ -17,9 +18,11 @@ type Stash struct {
 }
 
 type DriftDetector struct {
-	RepoDir   string
-	Projects  []models.TypedProject
-	Config    config.DriftiveConfig
+	RepoDir    string
+	Projects   []models.TypedProject
+	Config     *config.DriftiveConfig
+	RepoConfig *repo.DriftiveRepoConfig
+
 	workerWg  sync.WaitGroup
 	results   chan DriftProjectResult
 	semaphore chan struct{}
@@ -46,14 +49,16 @@ type DriftDetectionResult struct {
 	Duration       time.Duration        `json:"duration"`
 }
 
-func NewDriftDetector(repoDir string, projects []models.TypedProject, cfg config.DriftiveConfig, openIssues []*vcstypes.VCSIssue, openPRChangedFiles []string) DriftDetector {
+func NewDriftDetector(repoDir string, projects []models.TypedProject, cfg *config.DriftiveConfig,
+	repoConfig *repo.DriftiveRepoConfig, openIssues []*vcstypes.VCSIssue, openPRChangedFiles []string) DriftDetector {
 	return DriftDetector{
-		RepoDir:   repoDir,
-		Projects:  projects,
-		Config:    cfg,
-		workerWg:  sync.WaitGroup{},
-		results:   nil,
-		semaphore: make(chan struct{}, utils.Max(1, cfg.Concurrency)),
+		RepoDir:    repoDir,
+		Projects:   projects,
+		Config:     cfg,
+		RepoConfig: repoConfig,
+		workerWg:   sync.WaitGroup{},
+		results:    nil,
+		semaphore:  make(chan struct{}, utils.Max(1, cfg.Concurrency)),
 
 		Stash: Stash{
 			OpenPRChangedFiles: openPRChangedFiles,

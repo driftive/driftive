@@ -32,6 +32,20 @@ func (c *GithubActionContext) IsValid() bool {
 	return c != nil && c.Repository != "" && c.RepositoryOwner != "" && c.GetRepositoryName() != ""
 }
 
+// ValidateGithubContext checks if the GitHub context is valid. Github context is not mandatory, though
+func (c *GithubActionContext) ValidateGithubContext() error {
+	if c.Repository == "" {
+		return fmt.Errorf("repository is empty")
+	}
+	if c.RepositoryOwner == "" {
+		return fmt.Errorf("repository owner is empty")
+	}
+	if c.GetRepositoryName() == "" {
+		return fmt.Errorf("repository name is empty")
+	}
+	return nil
+}
+
 func (c *GithubActionContext) GetRepositoryName() string {
 	if c == nil {
 		return ""

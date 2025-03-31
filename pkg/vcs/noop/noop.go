@@ -28,3 +28,11 @@ func (s *SCMNoop) CreateOrUpdateIssue(ctx context.Context, driftiveIssue types.G
 		Issue:       nil,
 	}
 }
+
+func (s *SCMNoop) CreateIssueComment(ctx context.Context, issueNumber int) error {
+	return nil
+}
+
+func (s *SCMNoop) CloseIssue(ctx context.Context, issueNumber int) error {
+	return nil
+}

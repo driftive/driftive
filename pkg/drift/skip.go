@@ -28,8 +28,9 @@ func removeRepoDirPrefix(repoPath string, fullFilePath string) string {
 }
 
 func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetectionResult) {
-	if analysisResult.TotalDrifted > 0 && d.Config.GithubContext.IsValid() && d.Config.GithubToken != "" {
-		for _, projectResult := range analysisResult.ProjectResults {
+	if analysisResult.TotalDrifted > 0 {
+		for i := range analysisResult.ProjectResults {
+			projectResult := &analysisResult.ProjectResults[i]
 			if projectResult.Drifted {
 				if len(d.Stash.OpenPRChangedFiles) <= 0 {
 					return
