@@ -27,7 +27,7 @@ func parseDriftiveToken() string {
 	return token
 }
 
-func ParseConfig() DriftiveConfig {
+func ParseConfig() *DriftiveConfig {
 	var repositoryUrl string
 	var slackWebhookUrl string
 	var branch string
@@ -59,10 +59,16 @@ func ParseConfig() DriftiveConfig {
 	if err != nil {
 		log.Warn().Msgf("Failed to parse github action context. %v", err)
 	}
+	if ghContext != nil {
+		err := ghContext.ValidateGithubContext()
+		if err != nil {
+			log.Fatal().Msgf("Invalid github context. %v", err)
+		}
+	}
 
 	driftiveToken := parseDriftiveToken()
 
-	return DriftiveConfig{
+	return &DriftiveConfig{
 		RepositoryUrl:      repositoryUrl,
 		Branch:             branch,
 		RepositoryPath:     strings.TrimSuffix(repositoryPath, utils.PathSeparator),

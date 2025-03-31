@@ -2,7 +2,7 @@ package types
 
 import (
 	"driftive/pkg/models"
-	"github.com/google/go-github/v69/github"
+	"driftive/pkg/vcs/vcstypes"
 )
 
 const (
@@ -17,9 +17,9 @@ type GHProject struct {
 }
 
 type ProjectIssue struct {
-	Project models.Project `json:"project" yaml:"project"`
-	Issue   github.Issue   `json:"issue" yaml:"issue"`
-	Kind    string         `json:"kind" yaml:"kind" validate:"oneof=drift error"`
+	Project models.Project    `json:"project" yaml:"project"`
+	Issue   vcstypes.VCSIssue `json:"issue" yaml:"issue"`
+	Kind    string            `json:"kind" yaml:"kind" validate:"oneof=drift error"`
 }
 
 type GithubIssue struct {

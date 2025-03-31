@@ -1,13 +1,15 @@
 package drift
 
 import (
+	"context"
 	"driftive/pkg/exec"
 	"driftive/pkg/models"
 	"driftive/pkg/utils"
-	"github.com/rs/zerolog/log"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func (d *DriftDetector) detectDriftConcurrently(project models.TypedProject, projectDir string) {
@@ -25,20 +27,20 @@ func (d *DriftDetector) detectDriftConcurrently(project models.TypedProject, pro
 	d.results <- result
 }
 
-func (d *DriftDetector) DetectDrift() DriftDetectionResult {
+func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 	absolutePath, err := filepath.Abs(d.RepoDir)
 	if err != nil {
 		log.Error().Msgf("Error getting absolute path of %s: %v", d.RepoDir, err)
 		return DriftDetectionResult{}
 	}
 
-	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", absolutePath, d.Concurrency)
+	log.Info().Msgf("Starting drift analysis in %s. Concurrency: %d", absolutePath, d.Config.Concurrency)
 	d.results = make(chan DriftProjectResult, len(d.Projects))
 	var totalChecked = 0
 	startTime := time.Now()
 
 	for idx, proj := range d.Projects {
-		projectDir := strings.TrimPrefix(strings.Replace(proj.Dir, d.RepoDir, "", -1), utils.PathSeparator)
+		projectDir := strings.TrimPrefix(strings.ReplaceAll(proj.Dir, d.RepoDir, ""), utils.PathSeparator)
 
 		if projectDir == "" {
 			continue
@@ -70,6 +72,11 @@ func (d *DriftDetector) DetectDrift() DriftDetectionResult {
 		TotalChecked:   len(d.Projects),
 		Duration:       time.Since(startTime),
 	}
+
+	if d.RepoConfig.Settings.SkipIfOpenPR {
+		d.handleSkipIfContainsPRChanges(&result)
+	}
+
 	return result
 }
 

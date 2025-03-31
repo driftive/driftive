@@ -3,8 +3,10 @@ package gh
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"os"
+	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 type GithubActionContext struct {
@@ -23,6 +25,36 @@ type GithubActionContext struct {
 	RefType          string      `json:"ref_type"`
 	Repository       string      `json:"repository"`
 	RepositoryOwner  string      `json:"repository_owner"`
+}
+
+// IsValid returns true if the GitHub context has all required fields
+func (c *GithubActionContext) IsValid() bool {
+	return c != nil && c.Repository != "" && c.RepositoryOwner != "" && c.GetRepositoryName() != ""
+}
+
+// ValidateGithubContext checks if the GitHub context is valid. Github context is not mandatory, though
+func (c *GithubActionContext) ValidateGithubContext() error {
+	if c.Repository == "" {
+		return fmt.Errorf("repository is empty")
+	}
+	if c.RepositoryOwner == "" {
+		return fmt.Errorf("repository owner is empty")
+	}
+	if c.GetRepositoryName() == "" {
+		return fmt.Errorf("repository name is empty")
+	}
+	return nil
+}
+
+func (c *GithubActionContext) GetRepositoryName() string {
+	if c == nil {
+		return ""
+	}
+	repoName := strings.Split(c.Repository, "/")
+	if len(repoName) > 0 {
+		return repoName[len(repoName)-1]
+	}
+	return ""
 }
 
 func ParseGithubActionContext(ghContext string) (*GithubActionContext, error) {

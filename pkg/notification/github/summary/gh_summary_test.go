@@ -3,8 +3,8 @@ package summary
 import (
 	"driftive/pkg/models"
 	"driftive/pkg/notification/github/types"
+	"driftive/pkg/vcs/vcstypes"
 	_ "embed"
-	"github.com/google/go-github/v69/github"
 	"strings"
 	"testing"
 )
@@ -18,16 +18,16 @@ func TestGetSummaryIssueBody(t *testing.T) {
 			Project: models.Project{
 				Dir: "projs/project1",
 			},
-			Issue: github.Issue{
-				Number: github.Ptr(1),
+			Issue: vcstypes.VCSIssue{
+				Number: 1,
 			},
 			Kind: "drift",
 		}, {
 			Project: models.Project{
 				Dir: "projs/project2",
 			},
-			Issue: github.Issue{
-				Number: github.Ptr(2),
+			Issue: vcstypes.VCSIssue{
+				Number: 2,
 			},
 			Kind: "drift",
 		}},
@@ -35,8 +35,8 @@ func TestGetSummaryIssueBody(t *testing.T) {
 			Project: models.Project{
 				Dir: "projs/project3",
 			},
-			Issue: github.Issue{
-				Number: github.Ptr(3),
+			Issue: vcstypes.VCSIssue{
+				Number: 3,
 			},
 			Kind: "drift",
 		}},

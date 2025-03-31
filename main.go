@@ -8,6 +8,8 @@ import (
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
 	"driftive/pkg/notification"
+	"driftive/pkg/vcs"
+	"driftive/pkg/vcs/vcstypes"
 	"errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -36,6 +38,33 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 	return createdDir, true
 }
 
+type ChangedFile = string
+
+func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) ([]*vcstypes.VCSIssue, []ChangedFile) {
+	var allOpenIssues []*vcstypes.VCSIssue
+	changedFiles := make([]ChangedFile, 0)
+	if cfg.GithubContext.IsValid() && cfg.GithubToken != "" {
+		log.Info().Msg("Github context detected.")
+		issues, err := scmOps.GetAllOpenRepoIssues(ctx)
+		if err != nil {
+			log.Fatal().Msgf("Failed to get open issues: %v", err)
+		}
+		allOpenIssues = issues
+
+		if repoConfig.Settings.SkipIfOpenPR {
+			files, err := scmOps.GetChangedFilesForAllPRs(ctx)
+			if err != nil {
+				log.Fatal().Msgf("Failed to get changed files for open PRs: %v", err)
+			}
+			changedFiles = files
+		} else {
+			log.Info().Msg("Not checking for changed files in open PRs because skip_if_open_pr is not enabled.")
+		}
+	}
+
+	return allOpenIssues, changedFiles
+}
+
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
 	cfg := config.ParseConfig()
@@ -47,20 +76,30 @@ func main() {
 		defer os.RemoveAll(repoDir)
 	}
 
-	repoConfig, err := config.DetectRepoConfig(repoDir)
-	if err != nil && !errors.Is(err, config.ErrMissingRepoConfig) {
+	repoConfig, err := repo.DetectRepoConfig(repoDir)
+	if err != nil && !errors.Is(err, repo.ErrMissingRepoConfig) {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
-	repoConfig = repoConfigOrDefault(repoConfig)
+	repoConfig = repo.RepoConfigOrDefault(repoConfig)
 	repo.ValidateRepoConfig(repoConfig)
 	showInitMessage(cfg, repoConfig)
 
+	if err != nil {
+		log.Fatal().Msgf("Failed to create GitHub client: %v", err)
+	}
+	scmOps, err := vcs.NewVCS(cfg, repoConfig)
+	if err != nil {
+		log.Fatal().Msgf("Failed to create VCS client: %v", err)
+	}
+
+	openIssues, changedFiles := prepareStash(ctx, scmOps, cfg, repoConfig)
+
 	projects := discover.AutoDiscoverProjects(repoDir, repoConfig)
 	log.Info().Msgf("Projects detected: %d", len(projects))
-	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg.Concurrency)
-	analysisResult := driftDetector.DetectDrift()
+	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg, repoConfig, openIssues, changedFiles)
+	analysisResult := driftDetector.DetectDrift(ctx)
 
-	notification.NewNotificationHandler(&cfg, repoConfig).
+	notification.NewNotificationHandler(cfg, repoConfig, scmOps).
 		HandleNotifications(ctx, analysisResult)
 
 	if analysisResult.TotalDrifted <= 0 {
@@ -70,15 +109,6 @@ func main() {
 	}
 }
 
-func repoConfigOrDefault(repoConfig *repo.DriftiveRepoConfig) *repo.DriftiveRepoConfig {
-	if repoConfig == nil {
-		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
-		return config.DefaultRepoConfig()
-	}
-	log.Info().Msg("Using detected driftive.y(a)ml configuration.")
-	return repoConfig
-}
-
 func parseOnOff(enabled bool) string {
 	if enabled {
 		return "on"
@@ -86,7 +116,7 @@ func parseOnOff(enabled bool) string {
 	return "off"
 }
 
-func showInitMessage(cfg config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
+func showInitMessage(cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
 	log.Info().Msg("Starting driftive...")
 	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s. close resolved issues: %s. max opened issues: %d",
 		cfg.Concurrency,
