@@ -1,0 +1,4 @@
+auto_discover:
+  enabled: true
+  inclusions:
+    - '**/*.tf'
