@@ -76,11 +76,11 @@ func main() {
 		defer os.RemoveAll(repoDir)
 	}
 
-	repoConfig, err := config.DetectRepoConfig(repoDir)
-	if err != nil && !errors.Is(err, config.ErrMissingRepoConfig) {
+	repoConfig, err := repo.DetectRepoConfig(repoDir)
+	if err != nil && !errors.Is(err, repo.ErrMissingRepoConfig) {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
-	repoConfig = repoConfigOrDefault(repoConfig)
+	repoConfig = repo.RepoConfigOrDefault(repoConfig)
 	repo.ValidateRepoConfig(repoConfig)
 	showInitMessage(cfg, repoConfig)
 
@@ -88,11 +88,11 @@ func main() {
 		log.Fatal().Msgf("Failed to create GitHub client: %v", err)
 	}
 	scmOps, err := vcs.NewVCS(cfg, repoConfig)
+	if err != nil {
+		log.Fatal().Msgf("Failed to create VCS client: %v", err)
+	}
 
 	openIssues, changedFiles := prepareStash(ctx, scmOps, cfg, repoConfig)
-	if err != nil {
-		log.Fatal().Msgf("Failed to prepare stash. %v", err)
-	}
 
 	projects := discover.AutoDiscoverProjects(repoDir, repoConfig)
 	log.Info().Msgf("Projects detected: %d", len(projects))
@@ -107,15 +107,6 @@ func main() {
 	} else if cfg.ExitCode {
 		os.Exit(1)
 	}
-}
-
-func repoConfigOrDefault(repoConfig *repo.DriftiveRepoConfig) *repo.DriftiveRepoConfig {
-	if repoConfig == nil {
-		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
-		return config.DefaultRepoConfig()
-	}
-	log.Info().Msg("Using detected driftive.y(a)ml configuration.")
-	return repoConfig
 }
 
 func parseOnOff(enabled bool) string {

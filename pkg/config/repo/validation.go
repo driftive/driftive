@@ -2,17 +2,19 @@ package repo
 
 import (
 	"errors"
+	"fmt"
 	"github.com/rs/zerolog/log"
 )
 
-var ErrMissingRepoConfig = "missing repository config"
+var ErrMissingRepoConfig = fmt.Errorf("driftive.yml not found")
+var ErrMsgMissingRepoConfig = "missing repository config"
 var ErrInvalidLabelName = "invalid label name"
 var ErrConflictingLabels = "conflicting drift and error labels"
 
 func ValidateRepoConfig(repoConfig *DriftiveRepoConfig) {
 	//nolint:staticcheck
 	if nil == repoConfig {
-		log.Fatal().Err(errors.New(ErrMissingRepoConfig)).Msg("Repository config is required. Please create a .driftive.y(a)ml file in the root of the repository.")
+		log.Fatal().Err(errors.New(ErrMsgMissingRepoConfig)).Msg("Repository config is required. Please create a .driftive.y(a)ml file in the root of the repository.")
 	}
 	//nolint:staticcheck
 	if nil != repoConfig.GitHub.Issues.Labels {
@@ -32,4 +34,13 @@ func ValidateRepoConfig(repoConfig *DriftiveRepoConfig) {
 			}
 		}
 	}
+}
+
+func RepoConfigOrDefault(repoConfig *DriftiveRepoConfig) *DriftiveRepoConfig {
+	if repoConfig == nil {
+		log.Info().Msg("No repository config detected. Using default auto-discovery rules.")
+		return DefaultRepoConfig()
+	}
+	log.Info().Msg("Using detected driftive.y(a)ml configuration.")
+	return repoConfig
 }

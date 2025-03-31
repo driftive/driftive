@@ -1,24 +1,20 @@
-package config
+package repo
 
 import (
-	"driftive/pkg/config/repo"
 	"driftive/pkg/utils"
-	"fmt"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 	"os"
 )
 
-var ErrMissingRepoConfig = fmt.Errorf("driftive.yml not found")
-
-func loadRepoConfig(filePath string) (*repo.DriftiveRepoConfig, error) {
+func loadRepoConfig(filePath string) (*DriftiveRepoConfig, error) {
 	log.Info().Msgf("Loading repo config from %s", filePath)
 	fileContent, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
-	cfg := &repo.DriftiveRepoConfig{
-		Settings: repo.DriftiveRepoConfigSettings{
+	cfg := &DriftiveRepoConfig{
+		Settings: DriftiveRepoConfigSettings{
 			SkipIfOpenPR: true,
 		},
 	}
@@ -42,10 +38,10 @@ func loadRepoConfig(filePath string) (*repo.DriftiveRepoConfig, error) {
 	return cfg, nil
 }
 
-func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
+func DetectRepoConfig(repoDir string) (*DriftiveRepoConfig, error) {
 	if os.Getenv("DRIFTIVE_REPO_CONFIG") != "" {
 		envConfigStr := os.Getenv("DRIFTIVE_REPO_CONFIG")
-		cfg := &repo.DriftiveRepoConfig{}
+		cfg := &DriftiveRepoConfig{}
 		err := yaml.Unmarshal([]byte(envConfigStr), cfg)
 		if err != nil {
 			return nil, err
@@ -59,31 +55,4 @@ func DetectRepoConfig(repoDir string) (*repo.DriftiveRepoConfig, error) {
 		return loadRepoConfig(repoDir + utils.PathSeparator + "driftive.yaml")
 	}
 	return nil, ErrMissingRepoConfig
-}
-
-func DefaultRepoConfig() *repo.DriftiveRepoConfig {
-	return &repo.DriftiveRepoConfig{
-		GitHub: repo.DriftiveRepoConfigGitHub{
-			Issues: repo.DriftiveRepoConfigGitHubIssues{
-				Enabled:       false,
-				CloseResolved: false,
-				MaxOpenIssues: 10,
-			},
-		},
-		AutoDiscover: repo.DriftiveRepoConfigAutoDiscover{
-			Inclusions: []string{"**/terragrunt.hcl", "**/*.tf"},
-			Exclusions: []string{".git/**", "**/modules/**", "**/.terragrunt-cache/**", "**/.terraform", "/terragrunt.hcl"},
-			ProjectRules: []repo.AutoDiscoverRule{
-				{
-					Pattern:    "terragrunt.hcl",
-					Executable: "terragrunt"},
-				{
-					Pattern:    "*.tf",
-					Executable: "terraform",
-				}},
-		},
-		Settings: repo.DriftiveRepoConfigSettings{
-			SkipIfOpenPR: true,
-		},
-	}
 }
