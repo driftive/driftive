@@ -15,7 +15,7 @@ func loadRepoConfig(filePath string) (*DriftiveRepoConfig, error) {
 	}
 	cfg := &DriftiveRepoConfig{
 		Settings: DriftiveRepoConfigSettings{
-			SkipIfOpenPR: true,
+			SkipIfOpenPR: false,
 		},
 	}
 	err = yaml.Unmarshal(fileContent, cfg)
