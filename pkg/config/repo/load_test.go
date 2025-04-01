@@ -36,7 +36,7 @@ func TestLoadConfig(t *testing.T) {
 					},
 				},
 				Settings: DriftiveRepoConfigSettings{
-					SkipIfOpenPR: true,
+					SkipIfOpenPR: false,
 				},
 			},
 			wantErr: false,
