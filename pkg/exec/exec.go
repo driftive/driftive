@@ -40,6 +40,9 @@ func RunCommandInDir(dir, name string, arg ...string) (string, error) {
 	log.Debug().Msgf("Running command in %s: %s %v", dir, name, arg)
 	cmd := exec.Command(name, arg...)
 	cmd.Env = os.Environ()
+	// TERRAGRUNT_FORWARD_TF_STDOUT format is deprecated since v0.73.0
+	// Reference: https://github.com/gruntwork-io/terragrunt/releases/tag/v0.73.0
+	// FIXME replace this by TG_TF_FORWARD_STDOUT=true when support is dropped
 	cmd.Env = append(cmd.Env, "TERRAGRUNT_FORWARD_TF_STDOUT=true")
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
