@@ -29,6 +29,7 @@ func removeRepoDirPrefix(repoPath string, fullFilePath string) string {
 
 func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetectionResult) {
 	log.Debug().Msgf("Handling skip if contains PR changes")
+	log.Debug().Msgf("RepoPath: %s", d.Config.RepositoryPath)
 	if analysisResult.TotalDrifted > 0 {
 		for i := range analysisResult.ProjectResults {
 			projectResult := &analysisResult.ProjectResults[i]
@@ -37,6 +38,7 @@ func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetec
 					return
 				}
 				for _, file := range d.Stash.OpenPRChangedFiles {
+					log.Debug().Msgf("Checking project %s for file %s", projectResult.Project.Dir, file)
 					fileFolder := removeTrailingSlash(getFolder(file))
 					projectFolder := removeTrailingSlash(removeRepoDirPrefix(d.Config.RepositoryPath, projectResult.Project.Dir))
 					log.Debug().Msgf("Comparing file folder %s with project folder %s", fileFolder, projectFolder)
