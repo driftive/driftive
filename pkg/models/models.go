@@ -14,6 +14,7 @@ type Project struct {
 
 // TypedProject represents a TF/Tofu/Terragrunt project to be analyzed
 type TypedProject struct {
+	// Dir is the relative path to the project
 	Dir  string      `json:"dir" yaml:"dir"`
 	Type ProjectType `json:"type" yaml:"type"`
 }

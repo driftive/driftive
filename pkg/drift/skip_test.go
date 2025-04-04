@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func makeMockedResult(repoDir string, total, drifted int) DriftDetectionResult {
+func makeMockedResult(total, drifted int) DriftDetectionResult {
 	projs := make([]DriftProjectResult, 0)
 
 	for i := 0; i < total; i++ {
@@ -22,7 +22,7 @@ func makeMockedResult(repoDir string, total, drifted int) DriftDetectionResult {
 
 		p := DriftProjectResult{
 			Project: models.TypedProject{
-				Dir:  repoDir + "gcp/myproject/app" + strconv.Itoa(i+1),
+				Dir:  "gcp/myproject/app" + strconv.Itoa(i+1),
 				Type: models.Terragrunt,
 			},
 			Drifted:        isDrifted,
@@ -46,7 +46,7 @@ func makeMockedResult(repoDir string, total, drifted int) DriftDetectionResult {
 
 func TestPRSkip(t *testing.T) {
 	repoDir := "/home/user/repo_dir/"
-	result := makeMockedResult(repoDir, 4, 3)
+	result := makeMockedResult(4, 3)
 	detector := DriftDetector{
 		Stash: Stash{
 			OpenPRChangedFiles: []string{
@@ -75,6 +75,30 @@ func TestPRSkip(t *testing.T) {
 	}
 }
 
+func TestProjectFolderIfRootWorkingDir(t *testing.T) {
+	projectDir := "project1"
+	file := "project1/main.tf"
+	fileFolder := removeTrailingSlash(getFolder(file))
+	if fileFolder != projectDir {
+		t.Errorf("Expected 'project1' but got '%s'", fileFolder)
+	}
+
+	getFolderResult := getFolder("/home/user/repo/project1/main.tofu")
+	if getFolderResult != "/home/user/repo/project1/" {
+		t.Errorf("Expected '/home/user/repo/project1' but got '%s'", getFolderResult)
+	}
+
+	getFolderResult = getFolder("project1/main.tofu")
+	if getFolderResult != "project1/" {
+		t.Errorf("Expected 'project1' but got '%s'", getFolderResult)
+	}
+
+	result := removeTrailingSlash("project1")
+	if result != "project1" {
+		t.Errorf("Expected 'project1' but got '%s'", result)
+	}
+}
+
 func TestRemoveTrailingSlash(t *testing.T) {
 	path := "/home/user/repo_dir/"
 	result := removeTrailingSlash(path)
@@ -86,21 +110,5 @@ func TestRemoveTrailingSlash(t *testing.T) {
 	result = removeTrailingSlash(path)
 	if result != "/home/user/repo_dir" {
 		t.Errorf("Expected '/home/user/repo_dir' but got '%s'", result)
-	}
-}
-
-func TestRemoveRepoDirPrefix(t *testing.T) {
-	repoPath := "/home/user/repo_dir/"
-	fullFilePath := "/home/user/repo_dir/gcp/myproject/app1/main.tf"
-	result := removeRepoDirPrefix(repoPath, fullFilePath)
-	if result != "gcp/myproject/app1/main.tf" {
-		t.Errorf("Expected 'gcp/myproject/app1/main.tf' but got '%s'", result)
-	}
-
-	repoPath = "/home/user/repo_dir"
-	fullFilePath = "/home/user/repo_dir/gcp/myproject/app1/main.tf"
-	result = removeRepoDirPrefix(repoPath, fullFilePath)
-	if result != "gcp/myproject/app1/main.tf" {
-		t.Errorf("Expected 'gcp/myproject/app1/main.tf' but got '%s'", result)
 	}
 }
