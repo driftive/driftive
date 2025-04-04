@@ -74,6 +74,12 @@ func (g *GHOps) GetChangedFilesForAllPRs(ctx context.Context) ([]string, error) 
 		changedFiles = append(changedFiles, files...)
 	}
 	log.Info().Msgf("Found %d changed files", len(changedFiles))
+
+	log.Debug().Msg("Changed files:")
+	for _, file := range changedFiles {
+		log.Debug().Msgf("- %s", file)
+	}
+
 	return changedFiles, nil
 }
 
