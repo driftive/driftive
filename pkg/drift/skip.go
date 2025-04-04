@@ -28,6 +28,7 @@ func removeRepoDirPrefix(repoPath string, fullFilePath string) string {
 }
 
 func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetectionResult) {
+	log.Debug().Msgf("Handling skip if contains PR changes")
 	if analysisResult.TotalDrifted > 0 {
 		for i := range analysisResult.ProjectResults {
 			projectResult := &analysisResult.ProjectResults[i]
@@ -38,13 +39,14 @@ func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetec
 				for _, file := range d.Stash.OpenPRChangedFiles {
 					fileFolder := removeTrailingSlash(getFolder(file))
 					projectFolder := removeTrailingSlash(removeRepoDirPrefix(d.Config.RepositoryPath, projectResult.Project.Dir))
-
+					log.Debug().Msgf("Comparing file folder %s with project folder %s", fileFolder, projectFolder)
 					if fileFolder == projectFolder {
 						projectResult.SkippedDueToPR = true
 						analysisResult.TotalDrifted--
-						log.Warn().Msgf("Marking project %s as skipped due to open PR", projectResult.Project.Dir)
+						log.Info().Msgf("Marking project %s as skipped due to open PR", projectResult.Project.Dir)
 						break
 					}
+					log.Debug().Msgf("File %s is not in project %s", file, projectResult.Project.Dir)
 				}
 			}
 		}
