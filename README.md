@@ -75,6 +75,8 @@ It supports the following configuration options:
       * `close_resolved` - close resolved issues
       * `max_open_issues` - maximum number of issues to keep open
       * `labels` - list of labels to apply to the issues
+* `settings`
+  * `skip_if_open_pr` - skip projects with open pull requests
   
 
 Example configuration:
@@ -114,6 +116,8 @@ github:
       max_open_issues: 5
       labels:
         - "plan-failed"
+settings:
+  skip_if_open_pr: true
 ```
 
 ### Github issues
