@@ -10,7 +10,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-github/v70/github"
+	"github.com/google/go-github/v72/github"
 	"github.com/rs/zerolog/log"
 	"strings"
 	"text/template"
@@ -111,7 +111,7 @@ func (g *GithubSummaryHandler) listAllIssues(ctx context.Context) ([]*github.Iss
 		if resp.NextPage == 0 {
 			break
 		}
-		opt.Page = resp.NextPage
+		opt.ListOptions.Page = resp.NextPage
 	}
 
 	return openIssues, nil
