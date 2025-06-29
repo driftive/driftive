@@ -5,7 +5,7 @@ import (
 	"driftive/pkg/notification/github/types"
 	"driftive/pkg/vcs/vcstypes"
 	"fmt"
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v73/github"
 	"github.com/rs/zerolog/log"
 	"strings"
 )
