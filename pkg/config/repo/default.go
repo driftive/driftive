@@ -8,6 +8,11 @@ func DefaultRepoConfig() *DriftiveRepoConfig {
 				CloseResolved: false,
 				MaxOpenIssues: 10,
 			},
+			PullRequests: DriftiveRepoConfigGithubPullRequests{
+				Enabled:             false,
+				CloseResolved:       false,
+				MaxOpenPullRequests: 10,
+			},
 		},
 		AutoDiscover: DriftiveRepoConfigAutoDiscover{
 			Inclusions: []string{"**/terragrunt.hcl", "**/*.tf"},

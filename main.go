@@ -11,9 +11,10 @@ import (
 	"driftive/pkg/vcs"
 	"driftive/pkg/vcs/vcstypes"
 	"errors"
+	"os"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"os"
 )
 
 // determineRepositoryDir returns the repository path to use. If repositoryPath is provided, it is returned. Otherwise, the repositoryUrl is returned.
@@ -40,9 +41,10 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 
 type ChangedFile = string
 
-func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) ([]*vcstypes.VCSIssue, []ChangedFile) {
+func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) ([]*vcstypes.VCSIssue, []ChangedFile, []*vcstypes.VCSPullRequest) {
 	var allOpenIssues []*vcstypes.VCSIssue
 	changedFiles := make([]ChangedFile, 0)
+	var allOpenPrs []*vcstypes.VCSPullRequest
 	if cfg.GithubContext.IsValid() && cfg.GithubToken != "" {
 		log.Info().Msg("Github context detected.")
 		issues, err := scmOps.GetAllOpenRepoIssues(ctx)
@@ -51,8 +53,13 @@ func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfi
 		}
 		allOpenIssues = issues
 
+		allOpenPrs, err := scmOps.GetAllOpenPRs(ctx)
+		if err != nil {
+			log.Fatal().Msgf("Failed to get open pull requests: %v", err)
+		}
+
 		if repoConfig.Settings.SkipIfOpenPR {
-			files, err := scmOps.GetChangedFilesForAllPRs(ctx)
+			files, err := scmOps.GetChangedFilesForAllOpenPrs(ctx, allOpenPrs)
 			if err != nil {
 				log.Fatal().Msgf("Failed to get changed files for open PRs: %v", err)
 			}
@@ -62,7 +69,7 @@ func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfi
 		}
 	}
 
-	return allOpenIssues, changedFiles
+	return allOpenIssues, changedFiles, allOpenPrs
 }
 
 func main() {
@@ -80,6 +87,7 @@ func main() {
 	if err != nil && !errors.Is(err, repo.ErrMissingRepoConfig) {
 		log.Fatal().Msgf("Failed to load repository config. %v", err)
 	}
+
 	repoConfig = repo.RepoConfigOrDefault(repoConfig)
 	repo.ValidateRepoConfig(repoConfig)
 	showInitMessage(cfg, repoConfig)
@@ -92,11 +100,11 @@ func main() {
 		log.Fatal().Msgf("Failed to create VCS client: %v", err)
 	}
 
-	openIssues, changedFiles := prepareStash(ctx, scmOps, cfg, repoConfig)
+	openIssues, changedFiles, openPRs := prepareStash(ctx, scmOps, cfg, repoConfig)
 
 	projects := discover.AutoDiscoverProjects(repoDir, repoConfig)
 	log.Info().Msgf("Projects detected: %d", len(projects))
-	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg, repoConfig, openIssues, changedFiles)
+	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg, repoConfig, openIssues, changedFiles, openPRs)
 	analysisResult := driftDetector.DetectDrift(ctx)
 
 	notification.NewNotificationHandler(cfg, repoConfig, scmOps).

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/google/go-github/v73/github"
 	"github.com/rs/zerolog/log"
@@ -338,4 +339,159 @@ func (g *GithubIssueNotification) closeIssues(ctx context.Context, issues []type
 	}
 
 	return closedIssues
+}
+
+type GithubPullRequestNotification struct {
+	config     *config.DriftiveConfig
+	repoConfig *repo.DriftiveRepoConfig
+	ghClient   *github.Client
+	scm        vcs.VCS
+}
+
+func NewGithubRemediationPullRequest(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig, ghOpts vcs.VCS) (*GithubPullRequestNotification, error) {
+	if config.GithubContext.Repository == "" || config.GithubContext.RepositoryOwner == "" {
+		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
+		return nil, errors.New(ErrRepoNotProvided)
+	}
+
+	ghClient, err := ghutils.GitHubClient(config.GithubToken)
+	if err != nil {
+		log.Warn().Msg("Github token not provided. Skipping github notification")
+		return nil, err
+	}
+	return &GithubPullRequestNotification{config: config, repoConfig: repoConfig, ghClient: ghClient, scm: ghOpts}, nil
+}
+
+func (g *GithubPullRequestNotification) Handle(ctx context.Context, analysisResult drift.DriftDetectionResult) (*types.GithubState, error) {
+	allOpenPullRequests, err := g.scm.GetAllOpenPRs(ctx)
+	if err != nil {
+		log.Error().Msgf("Failed to get open pull requests. %v", err)
+		return nil, err
+	}
+
+	state, err := g.HandlePullRequests(ctx, analysisResult, allOpenPullRequests)
+	if err != nil {
+		log.Error().Msgf("Failed to update github pull requests. %v", err)
+		return nil, err
+	}
+	log.Debug().Msgf("Github pull requests updated")
+
+	return state, nil
+}
+
+func (g *GithubPullRequestNotification) HandlePullRequests(ctx context.Context, driftResult drift.DriftDetectionResult, allOpenPullRequests []*vcstypes.VCSPullRequest) (*types.GithubState, error) {
+	var rateLimitedProjectDirs []string
+	var numOpenDriftPullRequests int
+	allDrivtiveOpenPrs := getProjectPrsFromGHPullRequestBodies(allOpenPullRequests)
+	for _, pr := range allDrivtiveOpenPrs {
+		if pr.Kind == types.DriftIssueKind {
+			numOpenDriftPullRequests++
+		}
+	}
+
+	var closeablePullRequests []types.ProjectPullRequest
+	for _, pr := range allDrivtiveOpenPrs {
+		if pr.Kind == types.DriftIssueKind {
+			for _, projectResult := range driftResult.ProjectResults {
+				if !projectResult.Drifted && pr.Project.Dir == projectResult.Project.Dir {
+					closeablePullRequests = append(closeablePullRequests, pr)
+				}
+			}
+		}
+	}
+
+	closedDriftPullRequests := g.closePullRequests(ctx, closeablePullRequests)
+	log.Info().Msgf("Closed %d drift remediation pull requests", len(closedDriftPullRequests))
+	numOpenDriftPullRequests = numOpenDriftPullRequests - len(closedDriftPullRequests)
+
+	var newlyCreatedPullRequests []types.ProjectPullRequest
+
+	// create pull requests for drifted projects
+	for _, projectResult := range driftResult.ProjectResults {
+		if projectResult.Drifted && !projectResult.SkippedDueToPR {
+			log.Debug().Msgf("Creating pull request for drifted project: %s", projectResult.Project.Dir)
+			prBody, err := parseGithubBodyTemplate(projectResult, issueBodyTemplate)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to parse github issue description template")
+				continue
+			}
+			currentTime := time.Now()
+
+			pullRequest := types.GithubPullRequest{
+				Title:   fmt.Sprintf("Drift remediation for %s", projectResult.Project.Dir),
+				Body:    *prBody,
+				Labels:  g.repoConfig.GitHub.PullRequests.Labels,
+				Branch:  fmt.Sprintf("drift-remediation-%s-%s", currentTime.Format("20060102150405"), projectResult.Project.Dir),
+				Base:    g.repoConfig.GitHub.PullRequests.BaseBranch,
+				Project: projectResult.Project,
+				Kind:    types.DriftIssueKind,
+				Time:    currentTime, // used in the pull request marker file
+			}
+
+			createOrUpdateResult := g.scm.CreateOrUpdatePullRequest(ctx, pullRequest, numOpenDriftPullRequests >= g.repoConfig.GitHub.PullRequests.MaxOpenPullRequests)
+			if createOrUpdateResult.Created {
+				numOpenDriftPullRequests++
+				log.Info().Msgf("Created pull request for drift remediation for project %s: %s", projectResult.Project.Dir, createOrUpdateResult.PullRequest.Url)
+				newlyCreatedPullRequests = append(newlyCreatedPullRequests, types.ProjectPullRequest{
+					Pr: *createOrUpdateResult.PullRequest,
+					Project: models.Project{
+						Dir: projectResult.Project.Dir,
+					},
+					Kind: types.DriftIssueKind,
+				})
+			}
+			if createOrUpdateResult.RateLimited {
+				rateLimitedProjectDirs = append(rateLimitedProjectDirs, projectResult.Project.Dir)
+			}
+
+		} else if projectResult.Drifted && projectResult.SkippedDueToPR {
+			log.Info().Msgf("Skipping pull request creation for %s due to open PRs", projectResult.Project.Dir)
+		}
+	}
+
+	return &types.GithubState{
+		RateLimitedDrifts:         rateLimitedProjectDirs,
+		DriftPullRequestsOpen:     append(allDrivtiveOpenPrs, newlyCreatedPullRequests...),
+		DriftPullRequestsResolved: closedDriftPullRequests,
+	}, nil
+}
+
+func getProjectPrsFromGHPullRequestBodies(pullRequests []*vcstypes.VCSPullRequest) []types.ProjectPullRequest {
+	ghPullRequests := make([]types.ProjectPullRequest, 0)
+	for _, pr := range pullRequests {
+		project, err := getProjectFromIssueBody(pr.Body)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Failed to get project name from issue metadata. Issue title: %s", pr.Title)
+			continue
+		}
+
+		if project == nil {
+			log.Debug().Msgf("Project not found in issue metadata. Issue: %s", pr.Title)
+			continue
+		}
+
+		ghPullRequests = append(ghPullRequests, types.ProjectPullRequest{
+			Project: project.Project,
+			Pr:      *pr,
+			Kind:    project.Kind,
+		})
+	}
+	return ghPullRequests
+}
+
+func (g *GithubPullRequestNotification) closePullRequests(ctx context.Context, pullRequests []types.ProjectPullRequest) []types.ProjectPullRequest {
+	if !g.repoConfig.GitHub.PullRequests.CloseResolved && len(pullRequests) > 0 {
+		log.Warn().Msg("Note: There are GH drift pull requests but driftive is not configured to close them.")
+		return []types.ProjectPullRequest{}
+	}
+
+	var closedPullRequests []types.ProjectPullRequest
+	for _, projPr := range pullRequests {
+		closed := g.ClosePullRequestWithComment(ctx, projPr)
+		if closed {
+			closedPullRequests = append(closedPullRequests, projPr)
+		}
+	}
+
+	return closedPullRequests
 }

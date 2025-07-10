@@ -5,9 +5,10 @@ import (
 	"driftive/pkg/notification/github/types"
 	"driftive/pkg/vcs/vcstypes"
 	"fmt"
+	"strings"
+
 	"github.com/google/go-github/v73/github"
 	"github.com/rs/zerolog/log"
-	"strings"
 )
 
 func (g *GHOps) toSCMIssues(issues []*github.Issue) []*vcstypes.VCSIssue {
@@ -45,7 +46,7 @@ func (g *GHOps) GetAllOpenRepoIssues(ctx context.Context) ([]*vcstypes.VCSIssue,
 	// Split owner/repository_name
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
-		return nil, fmt.Errorf("invalid repository name")
+		return nil, fmt.Errorf("invalid repository name: %s. Expected format: owner/repo", g.config.GithubContext.Repository)
 	}
 
 	for {
