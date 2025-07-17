@@ -126,9 +126,10 @@ func parseOnOff(enabled bool) string {
 
 func showInitMessage(cfg *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig) {
 	log.Info().Msg("Starting driftive...")
-	log.Info().Msgf("Options: concurrency: %d. github issues: %s. slack: %s. close resolved issues: %s. max opened issues: %d",
+	log.Info().Msgf("Options: concurrency: %d. github issues: %s. github pull requests: %s. slack %s. close resolved issues: %s. max opened issues: %d",
 		cfg.Concurrency,
 		parseOnOff(repoConfig.GitHub.Issues.Enabled),
+		parseOnOff(repoConfig.GitHub.PullRequests.Enabled),
 		parseOnOff(cfg.SlackWebhookUrl != ""),
 		parseOnOff(repoConfig.GitHub.Issues.CloseResolved),
 		repoConfig.GitHub.Issues.MaxOpenIssues)

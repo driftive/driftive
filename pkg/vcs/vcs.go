@@ -24,7 +24,7 @@ type VCS interface {
 	GetAllOpenPRs(ctx context.Context) ([]*vcstypes.VCSPullRequest, error)
 	BranchExists(ctx context.Context, branchName string) (bool, error)
 	CreateBranch(ctx context.Context, branchName string) error
-	AddFileToBranch(ctx context.Context, branchName string, filePath string, content string, commitMessage string) error
+	AddOrUpdateFileInBranch(ctx context.Context, branchName string, filePath string, fileContent string, exists bool, sha *string, commitMessage string) error
 	CreateOrUpdatePullRequest(ctx context.Context, driftivePullRequest types.GithubPullRequest, updateOnly bool) vcstypes.CreateOrUpdatePullRequestResult
 	CreatePullRequestComment(ctx context.Context, pullRequestNumber int, comment string) error
 	ClosePullRequest(ctx context.Context, pullRequestNumber int) error

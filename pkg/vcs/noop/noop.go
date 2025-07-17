@@ -49,7 +49,7 @@ func (s *SCMNoop) CreateBranch(ctx context.Context, branchName string) error {
 	return nil
 }
 
-func (s *SCMNoop) AddFileToBranch(ctx context.Context, branchName string, filePath string, content string, commitMessage string) error {
+func (s *SCMNoop) AddOrUpdateFileInBranch(ctx context.Context, branchName string, filePath string, fileContent string, exists bool, sha *string, commitMessage string) error {
 	return nil
 }
 
