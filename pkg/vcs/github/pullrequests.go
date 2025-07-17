@@ -6,6 +6,7 @@ import (
 	"driftive/pkg/vcs/vcstypes"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -157,28 +158,79 @@ func (g *GHOps) CreateBranch(ctx context.Context, branchName string) error {
 	return nil
 }
 
-func (g *GHOps) AddFileToBranch(
+func (g *GHOps) checkFileExists(ctx context.Context, branchName string, filePath string) (bool, *string, error) {
+	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
+	if len(ownerRepo) != 2 {
+		return false, nil, fmt.Errorf("invalid repository name")
+	}
+	owner := ownerRepo[0]
+	repo := ownerRepo[1]
+
+	ioReadCloser, upstreamFileContent, resp, err := g.ghClient.Repositories.DownloadContentsWithMeta(ctx, owner, repo, filePath, &github.RepositoryContentGetOptions{
+		Ref: branchName,
+	})
+
+	if err != nil {
+		switch resp.StatusCode {
+		case 404:
+			return false, nil, nil // File does not exist
+		case 403:
+			return false, nil, fmt.Errorf("rate limited or forbidden access to file %s in branch %s: %w", filePath, branchName, err)
+		case 200:
+			// DownloadContentWithMeta returns 200 even if the file does not exist
+			return false, nil, nil
+		default:
+			return false, nil, fmt.Errorf("error checking file %s in branch %s: %w", filePath, branchName, err)
+		}
+	}
+
+	defer ioReadCloser.Close()                // Close the response body to avoid resource leaks, we don't need the content
+	return true, upstreamFileContent.SHA, nil // File exists
+}
+
+func (g *GHOps) AddOrUpdateFileInBranch(
 	ctx context.Context,
 	branchName string,
 	filePath string,
 	fileContent string,
+	exists bool,
+	sha *string,
 	commitMessage string) error {
 	ownerRepo := strings.Split(g.config.GithubContext.Repository, "/")
 	if len(ownerRepo) != 2 {
 		return fmt.Errorf("invalid repository name")
 	}
+	owner := ownerRepo[0]
+	repo := ownerRepo[1]
 
-	_, _, err := g.ghClient.Repositories.CreateFile(ctx, ownerRepo[0], ownerRepo[1], filePath, &github.RepositoryContentFileOptions{
-		Message: github.Ptr(commitMessage),
-		Content: []byte(fileContent),
-		Branch:  github.Ptr(branchName),
-	})
-	if err != nil {
-		return fmt.Errorf("error adding file to branch: %w", err)
+	if exists && sha == nil {
+		return fmt.Errorf("SHA is required to update an existing file")
 	}
 
-	log.Debug().Msgf("Added file %s to branch %s in repository %s/%s", filePath, branchName, ownerRepo[0], ownerRepo[1])
-	return nil
+	if exists {
+		_, _, err := g.ghClient.Repositories.UpdateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
+			Message: github.Ptr(commitMessage),
+			Content: []byte(fileContent),
+			SHA:     sha,
+			Branch:  github.Ptr(branchName),
+		})
+		if err != nil {
+			return fmt.Errorf("error updating file %s in branch %s: %w", filePath, branchName, err)
+		}
+		log.Debug().Msgf("Updated file %s in branch %s", filePath, branchName)
+		return nil
+	} else {
+		_, _, err := g.ghClient.Repositories.CreateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
+			Message: github.Ptr(commitMessage),
+			Content: []byte(fileContent),
+			Branch:  github.Ptr(branchName),
+		})
+		if err != nil {
+			return fmt.Errorf("error creating file %s in branch %s: %w", filePath, branchName, err)
+		}
+		log.Debug().Msgf("Created file %s in branch %s", filePath, branchName)
+		return nil
+	}
 }
 
 func (g *GHOps) addPullRequestLabels(ctx context.Context, owner string, repo string, pullRequest *github.PullRequest, labels []string) error {
@@ -253,10 +305,25 @@ func (g *GHOps) CreateOrUpdatePullRequest(
 		}
 	}
 
-	// Add remediation file to the new branch
-	fileContent := "driftive remediation " + driftivePullRequest.Time.UTC().Format(time.UnixDate) + "\n"
-	commitContent := fmt.Sprintf("Adds driftive remediation file for project %s", driftivePullRequest.Project.Dir)
-	err = g.AddFileToBranch(ctx, driftivePullRequest.Branch, "driftive-remediation.txt", fileContent, commitContent)
+	// Add or update the remediation file in the new branch
+	var commitMessage string
+	remediationString := "# This file was automatically generated via driftive " + driftivePullRequest.Time.UTC().Format(time.UnixDate) + "\n"
+	remediationFilePath := filepath.Join(driftivePullRequest.Project.Dir, "driftive-remediation.tf")
+	fileExists, upstreamFileSHA, err := g.checkFileExists(ctx, driftivePullRequest.Branch, remediationFilePath)
+	if err != nil {
+		log.Error().Msgf("Failed to check if file exists in branch %s: %v", driftivePullRequest.Branch, err)
+		return vcstypes.CreateOrUpdatePullRequestResult{
+			Created:     false,
+			RateLimited: false,
+			PullRequest: nil,
+		}
+	}
+
+	commitMessage = fmt.Sprintf("Creates driftive remediation file for project %s", driftivePullRequest.Project.Dir)
+	if fileExists {
+		commitMessage = fmt.Sprintf("Updates driftive remediation file for project %s", driftivePullRequest.Project.Dir)
+	}
+	err = g.AddOrUpdateFileInBranch(ctx, driftivePullRequest.Branch, remediationFilePath, remediationString, fileExists, upstreamFileSHA, commitMessage)
 	if err != nil {
 		log.Error().Msgf("Failed to add file to branch %s: %v", driftivePullRequest.Branch, err)
 		// Clean up branch if file addition fails
