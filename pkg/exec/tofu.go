@@ -1,5 +1,7 @@
 package exec
 
+import "context"
+
 type TofuExecutor struct {
 	dir string
 }
@@ -9,11 +11,11 @@ func (t TofuExecutor) Dir() string {
 }
 
 func (t TofuExecutor) Init(args ...string) (string, error) {
-	return RunCommandInDir(t.Dir(), "tofu", append([]string{"init"}, args...)...)
+	return RunCommandInDir(context.Background(), t.Dir(), "tofu", append([]string{"init"}, args...)...)
 }
 
 func (t TofuExecutor) Plan(args ...string) (string, error) {
-	return RunCommandInDir(t.Dir(), "tofu", append([]string{"plan"}, args...)...)
+	return RunCommandInDir(context.Background(), t.Dir(), "tofu", append([]string{"plan"}, args...)...)
 }
 
 func (t TofuExecutor) ParsePlan(output string) string {

@@ -1,5 +1,7 @@
 package exec
 
+import "context"
+
 type TerragruntExecutor struct {
 	dir string
 }
@@ -9,11 +11,11 @@ func (t TerragruntExecutor) Dir() string {
 }
 
 func (t TerragruntExecutor) Init(args ...string) (string, error) {
-	return RunCommandInDir(t.Dir(), "terragrunt", append([]string{"init"}, args...)...)
+	return RunCommandInDir(context.Background(), t.Dir(), "terragrunt", append([]string{"init"}, args...)...)
 }
 
 func (t TerragruntExecutor) Plan(args ...string) (string, error) {
-	return RunCommandInDir(t.Dir(), "terragrunt", append([]string{"plan"}, args...)...)
+	return RunCommandInDir(context.Background(), t.Dir(), "terragrunt", append([]string{"plan"}, args...)...)
 }
 
 func (t TerragruntExecutor) ParsePlan(output string) string {

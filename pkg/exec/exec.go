@@ -1,11 +1,13 @@
 package exec
 
 import (
+	"context"
 	"driftive/pkg/models"
 	"errors"
-	"github.com/rs/zerolog/log"
 	"os"
 	"os/exec"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Executor interface {
@@ -29,16 +31,16 @@ func NewExecutor(dir string, t models.ProjectType) Executor {
 	}
 }
 
-func RunCommand(name string, arg ...string) (string, error) {
+func RunCommand(ctx context.Context, name string, arg ...string) (string, error) {
 	log.Debug().Msgf("Running command: %s %v", name, arg)
-	cmd := exec.Command(name, arg...)
+	cmd := exec.CommandContext(ctx, name, arg...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 
-func RunCommandInDir(dir, name string, arg ...string) (string, error) {
+func RunCommandInDir(ctx context.Context, dir, name string, arg ...string) (string, error) {
 	log.Debug().Msgf("Running command in %s: %s %v", dir, name, arg)
-	cmd := exec.Command(name, arg...)
+	cmd := exec.CommandContext(ctx, name, arg...)
 	cmd.Env = os.Environ()
 	// TERRAGRUNT_FORWARD_TF_STDOUT format is deprecated since v0.73.0
 	// Reference: https://github.com/gruntwork-io/terragrunt/releases/tag/v0.73.0
