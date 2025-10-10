@@ -2,9 +2,10 @@ package repo
 
 import (
 	"driftive/pkg/utils"
+	"os"
+
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
-	"os"
 )
 
 func loadRepoConfig(filePath string) (*DriftiveRepoConfig, error) {
@@ -23,6 +24,7 @@ func loadRepoConfig(filePath string) (*DriftiveRepoConfig, error) {
 		return nil, err
 	}
 
+	// Issues
 	if cfg.GitHub.Issues.MaxOpenIssues == 0 {
 		cfg.GitHub.Issues.MaxOpenIssues = 10
 	}
@@ -33,6 +35,15 @@ func loadRepoConfig(filePath string) (*DriftiveRepoConfig, error) {
 
 	if cfg.GitHub.Summary.IssueTitle == "" {
 		cfg.GitHub.Summary.IssueTitle = "Driftive Summary"
+	}
+
+	// Pull Requests
+	if cfg.GitHub.PullRequests.MaxOpenPullRequests == 0 {
+		cfg.GitHub.PullRequests.MaxOpenPullRequests = 10
+	}
+
+	if cfg.GitHub.PullRequests.BaseBranch == "" {
+		cfg.GitHub.PullRequests.BaseBranch = "main"
 	}
 
 	return cfg, nil

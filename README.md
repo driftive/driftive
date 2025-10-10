@@ -9,7 +9,7 @@ Driftive is a tool for detecting drift in Terragrunt/Terraform/OpenTofu projects
 ## Features
 * Concurrently analyze multiple projects in a repository
 * Slack notifications
-* Creates GitHub issues for detected drifts
+* Creates GitHub issues and/or pull requests for detected drifts
 * Supports Terraform, Terragrunt, and OpenTofu projects
 
 ## Installation
@@ -75,6 +75,12 @@ It supports the following configuration options:
       * `close_resolved` - close resolved issues
       * `max_open_issues` - maximum number of issues to keep open
       * `labels` - list of labels to apply to the issues
+  * `pull_requests` - GitHub pull requests configuration
+    * `enabled` - enable GitHub pull requests
+    * `close_resolved` - close resolved pull requests
+    * `max_open_pull_requests` - maximum number of open pull requests to keep
+    * `base_branch` - base branch for the pull requests (default: `main`)
+    * `labels` - list of labels to apply to the pull requests
 * `settings`
   * `skip_if_open_pr` - skip projects with open pull requests
   

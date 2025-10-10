@@ -3,6 +3,7 @@ package types
 import (
 	"driftive/pkg/models"
 	"driftive/pkg/vcs/vcstypes"
+	"time"
 )
 
 const (
@@ -30,9 +31,28 @@ type GithubIssue struct {
 	Kind    string
 }
 
+type ProjectPullRequest struct {
+	Project models.Project          `json:"project" yaml:"project"`
+	Pr      vcstypes.VCSPullRequest `json:"pr" yaml:"pr"`
+	Kind    string                  `json:"kind" yaml:"kind" validate:"oneof=drift error"`
+}
+
+type GithubPullRequest struct {
+	Title   string
+	Body    string
+	Labels  []string
+	Branch  string
+	Base    string
+	Project models.TypedProject
+	Kind    string
+	Time    time.Time
+}
+
 type GithubState struct {
-	DriftIssuesOpen     []ProjectIssue
-	DriftIssuesResolved []ProjectIssue
+	DriftIssuesOpen           []ProjectIssue
+	DriftIssuesResolved       []ProjectIssue
+	DriftPullRequestsOpen     []ProjectPullRequest
+	DriftPullRequestsResolved []ProjectPullRequest
 
 	ErrorIssuesOpen     []ProjectIssue
 	ErrorIssuesResolved []ProjectIssue

@@ -15,10 +15,11 @@ type DriftiveConfig struct {
 	LogLevel string `json:"log_level" yaml:"log_level"`
 	ExitCode bool   `json:"exit_code" yaml:"exit_code"`
 
-	EnableStdoutResult bool   `json:"stdout_result" yaml:"stdout_result"`
-	SlackWebhookUrl    string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
-	GithubToken        string `json:"github_token" yaml:"github_token"`
-	GithubContext      *gh.GithubActionContext
+	EnableStdoutResult           bool   `json:"stdout_result" yaml:"stdout_result"`
+	SlackWebhookUrl              string `json:"slack_webhook_url" yaml:"slack_webhook_url"`
+	GithubToken                  string `json:"github_token" yaml:"github_token"`
+	GithubContext                *gh.GithubActionContext
+	CreateRemediationPullRequest bool `json:"create_remediation_pull_request" yaml:"create_remediation_pull_request"`
 
 	DriftiveApiUrl string `json:"api_url" yaml:"api_url"`
 	DriftiveToken  string `json:"token" yaml:"token"`

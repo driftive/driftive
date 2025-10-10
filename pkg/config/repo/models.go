@@ -37,8 +37,39 @@ type DriftiveRepoConfigGitHubSummary struct {
 }
 
 type DriftiveRepoConfigGitHub struct {
-	Issues  DriftiveRepoConfigGitHubIssues  `json:"issues" yaml:"issues"`
-	Summary DriftiveRepoConfigGitHubSummary `json:"summary" yaml:"summary"`
+	Issues       DriftiveRepoConfigGitHubIssues       `json:"issues" yaml:"issues"`
+	Summary      DriftiveRepoConfigGitHubSummary      `json:"summary" yaml:"summary"`
+	PullRequests DriftiveRepoConfigGithubPullRequests `json:"pull_requests" yaml:"pull_requests"`
+}
+
+type DriftiveRepoConfigGithubPullRequestsErrors struct {
+	// EnableErrors is used to enable or disable GitHub pull requests for errors
+	Enabled bool `json:"enabled" yaml:"enabled"`
+	// Labels is a list of labels to apply to pull requests created by driftive for errors
+	Labels []string `json:"labels" yaml:"labels"`
+	// MaxOpenPullRequests is the maximum number of open pull requests to have at any time
+	MaxOpenPullRequests int `json:"max_open_pull_requests" yaml:"max_open_pull_requests"`
+	// CloseResolved is used to close resolved driftive pull requests for errors
+	CloseResolved bool `json:"close_resolved" yaml:"close_resolved"`
+}
+
+type DriftiveRepoConfigGithubPullRequests struct {
+	// Enabled is used to enable or disable GitHub pull requests for drift remediation
+	Enabled bool `json:"enabled" yaml:"enabled"`
+	// Labels is a list of labels to apply to pull requests created by driftive for drift remediation
+	Labels []string `json:"labels" yaml:"labels"`
+	// BaseBranch is the base branch for the pull request
+	BaseBranch string `json:"base_branch" yaml:"base_branch"`
+	// RemediationBranchPrefix is the prefix for the branch name created by driftive for drift remediation
+	RemediationBranchPrefix string `json:"branch_prefix" yaml:"branch_prefix"`
+	// Title is the title of the pull request created by driftive for drift remediation
+	Title string `json:"title" yaml:"title"`
+	// CloseResolved is used to close resolved driftive pull requests
+	CloseResolved bool `json:"close_resolved" yaml:"close_resolved"`
+	// MaxOpenPullRequests is the maximum number of open pull requests to have at any time for drift remediation
+	MaxOpenPullRequests int `json:"max_open_pull_requests" yaml:"max_open_pull_requests"`
+	// Errors is used to configure error handling for GitHub pull requests
+	Errors DriftiveRepoConfigGithubPullRequestsErrors `json:"errors" yaml:"errors"`
 }
 
 // DriftiveRepoConfig is used to configure driftive for a repository.

@@ -4,10 +4,11 @@ import (
 	"driftive/pkg/gh"
 	"driftive/pkg/utils"
 	"flag"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"os"
 	"strings"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func validateArgs(repositoryUrl, repositoryPath, branch string) {
