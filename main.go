@@ -11,14 +11,15 @@ import (
 	"driftive/pkg/vcs"
 	"driftive/pkg/vcs/vcstypes"
 	"errors"
+	"os"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"os"
 )
 
 // determineRepositoryDir returns the repository path to use. If repositoryPath is provided, it is returned. Otherwise, the repositoryUrl is returned.
 // The second return value is true if the repositoryPath should be deleted after the program finishes.
-func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (string, bool) {
+func determineRepositoryDir(ctx context.Context, repositoryUrl, repositoryPath, branch string) (string, bool) {
 	if repositoryPath != "" {
 		return repositoryPath, false
 	}
@@ -29,7 +30,7 @@ func determineRepositoryDir(repositoryUrl, repositoryPath, branch string) (strin
 	}
 
 	log.Debug().Msgf("Created temp dir: %s", createdDir)
-	err = git.CloneRepo(repositoryUrl, branch, createdDir)
+	err = git.CloneRepo(ctx, repositoryUrl, branch, createdDir)
 	if err != nil {
 		panic(err)
 	}
@@ -70,7 +71,7 @@ func main() {
 	cfg := config.ParseConfig()
 	ctx := context.Background()
 
-	repoDir, shouldDelete := determineRepositoryDir(cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
+	repoDir, shouldDelete := determineRepositoryDir(ctx, cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
 	if shouldDelete {
 		log.Debug().Msg("Temp dir will be deleted after driftive finishes.")
 		defer os.RemoveAll(repoDir)
