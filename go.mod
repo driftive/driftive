@@ -1,9 +1,10 @@
 module driftive
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/google/go-github/v73 v73.0.0
+	github.com/google/go-github/v76 v76.0.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/rs/zerolog v1.34.0
 	gopkg.in/yaml.v3 v3.0.1
