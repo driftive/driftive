@@ -20,7 +20,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/google/go-github/v77/github"
+	"github.com/google/go-github/v81/github"
 	"github.com/rs/zerolog/log"
 )
 
