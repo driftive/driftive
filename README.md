@@ -12,6 +12,11 @@ Driftive is a tool for detecting drift in Terragrunt/Terraform/OpenTofu projects
 * Creates GitHub issues for detected drifts
 * Supports Terraform, Terragrunt, and OpenTofu projects
 
+## Prerequisites
+* Terraform (>= 0.14.0), Terragrunt (>= 0.73.0), or OpenTofu (>= 1.6.0) installed and in your PATH
+* GitHub token (for GitHub integration features)
+* Slack webhook URL (for Slack notifications)
+
 ## Installation
 
 ### CLI
