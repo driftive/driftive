@@ -15,4 +15,4 @@ auto_discover:
       executable: 'terragrunt'
 
     - pattern: "*.tf"
-      executable: "terraform"
+      executable: "tofu"
