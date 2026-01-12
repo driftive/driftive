@@ -124,14 +124,19 @@ func TestBuildBlockKitMessage_WithDrifts(t *testing.T) {
 	message := slack.buildBlockKitMessage(driftResult, 2)
 
 	// Verify basic structure
-	if message.Text == "" {
-		t.Error("expected fallback text to be set")
-	}
 	if len(message.Attachments) != 1 {
 		t.Fatalf("expected 1 attachment, got %d", len(message.Attachments))
 	}
 
 	attachment := message.Attachments[0]
+
+	// Verify fallback text is set on attachment
+	if attachment.Fallback == "" {
+		t.Error("expected fallback text to be set on attachment")
+	}
+	if !strings.Contains(attachment.Fallback, "2 project") {
+		t.Errorf("expected fallback to mention project count, got %s", attachment.Fallback)
+	}
 
 	// Verify color is danger (red) for drifts
 	if attachment.Color != colorDanger {
@@ -148,8 +153,8 @@ func TestBuildBlockKitMessage_WithDrifts(t *testing.T) {
 	if headerBlock.Type != "header" {
 		t.Errorf("expected first block to be header, got %s", headerBlock.Type)
 	}
-	if headerBlock.Text == nil || !strings.Contains(headerBlock.Text.Text, "Drift Detected") {
-		t.Error("expected header to contain 'Drift Detected'")
+	if headerBlock.Text == nil || headerBlock.Text.Text != ":warning: Drift Detected" {
+		t.Errorf("expected header to be ':warning: Drift Detected', got '%s'", headerBlock.Text.Text)
 	}
 
 	// Verify stats section has fields

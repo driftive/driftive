@@ -42,8 +42,9 @@ type slackBlock struct {
 }
 
 type slackAttachment struct {
-	Color  string       `json:"color"`
-	Blocks []slackBlock `json:"blocks"`
+	Color    string       `json:"color"`
+	Blocks   []slackBlock `json:"blocks"`
+	Fallback string       `json:"fallback,omitempty"`
 }
 
 type slackMessage struct {
@@ -84,7 +85,7 @@ func (slack Slack) buildBlockKitMessage(driftResult drift.DriftDetectionResult, 
 	// Determine header and color based on state
 	if nonSkippedDrifts > 0 {
 		color = colorDanger
-		headerText = ":warning: Infrastructure Drift Detected"
+		headerText = ":warning: Drift Detected"
 	} else if didResolveIssues(slack.IssuesState) {
 		color = colorSuccess
 		headerText = ":white_check_mark: All Drifts Resolved"
@@ -180,12 +181,20 @@ func (slack Slack) buildBlockKitMessage(driftResult drift.DriftDetectionResult, 
 		},
 	})
 
+	// Fallback text is shown in push notifications and clients that don't support Block Kit
+	var fallbackText string
+	if nonSkippedDrifts > 0 {
+		fallbackText = fmt.Sprintf("Drift detected in %d project(s)", nonSkippedDrifts)
+	} else {
+		fallbackText = "All drifts resolved"
+	}
+
 	return slackMessage{
-		Text: headerText, // Fallback text for notifications
 		Attachments: []slackAttachment{
 			{
-				Color:  color,
-				Blocks: blocks,
+				Color:    color,
+				Blocks:   blocks,
+				Fallback: fallbackText,
 			},
 		},
 	}
