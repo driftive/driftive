@@ -34,8 +34,22 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 		NumResolvedIssues: -1,
 		StateUpdated:      false,
 	}
+
+	// Send to Driftive API first to get the dashboard URL for other notifications
+	var dashboardURL string
+	if h.driftiveConfig.DriftiveToken != "" && h.driftiveConfig.DriftiveApiUrl != "" {
+		log.Info().Msg("Sending notification to driftive api...")
+		driftiveApiNotification := driftive.NewDriftiveNotification(h.driftiveConfig.DriftiveApiUrl, h.driftiveConfig.DriftiveToken)
+		response, err := driftiveApiNotification.Handle(ctx, analysisResult)
+		if err != nil {
+			log.Error().Msgf("Failed to send analysis result to driftive api. %v", err)
+		} else if response != nil {
+			dashboardURL = response.DashboardURL
+			log.Info().Msgf("Dashboard URL: %s", dashboardURL)
+		}
+	}
+
 	if h.repoConfig.GitHub.Issues.Enabled && h.driftiveConfig.GithubToken != "" && h.driftiveConfig.GithubContext != nil {
-		var err error
 		log.Info().Msg("Updating Github issues...")
 		gh, err := github.NewGithubIssueNotification(h.driftiveConfig, h.repoConfig, h.vcs)
 		if err == nil {
@@ -56,19 +70,14 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 
 	if h.driftiveConfig.SlackWebhookUrl != "" {
 		log.Info().Msg("Sending notification to slack...")
-		slackNotification := slack.Slack{Url: h.driftiveConfig.SlackWebhookUrl, IssuesState: issuesState}
+		slackNotification := slack.Slack{
+			Url:          h.driftiveConfig.SlackWebhookUrl,
+			IssuesState:  issuesState,
+			DashboardURL: dashboardURL,
+		}
 		err := slackNotification.Handle(ctx, analysisResult)
 		if err != nil {
 			log.Error().Msgf("Failed to send slack notification. %v", err)
-		}
-	}
-
-	if h.driftiveConfig.DriftiveToken != "" && h.driftiveConfig.DriftiveApiUrl != "" {
-		log.Info().Msg("Sending notification to driftive api...")
-		driftiveApiNotification := driftive.NewDriftiveNotification(h.driftiveConfig.DriftiveApiUrl, h.driftiveConfig.DriftiveToken)
-		err := driftiveApiNotification.Handle(ctx, analysisResult)
-		if err != nil {
-			log.Error().Msgf("Failed to analysis result to driftive api. %v", err)
 		}
 	}
 }
