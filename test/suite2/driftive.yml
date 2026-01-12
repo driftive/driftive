@@ -15,13 +15,13 @@ auto_discover:
       executable: 'terragrunt'
 
     - pattern: "*.tf"
-      executable: "terraform"
+      executable: "tofu"
 
 github:
   summary:
-    enabled: true
+    enabled: false
   issues:
-    enabled: true
+    enabled: false
     close_resolved: true
     max_open_issues: 1
     labels:
