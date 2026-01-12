@@ -40,12 +40,14 @@ func loadRepoConfig(filePath string) (*DriftiveRepoConfig, error) {
 
 func DetectRepoConfig(repoDir string) (*DriftiveRepoConfig, error) {
 	if os.Getenv("DRIFTIVE_REPO_CONFIG") != "" {
+		log.Info().Msg("Loading repo config from DRIFTIVE_REPO_CONFIG environment variable")
 		envConfigStr := os.Getenv("DRIFTIVE_REPO_CONFIG")
 		cfg := &DriftiveRepoConfig{}
 		err := yaml.Unmarshal([]byte(envConfigStr), cfg)
 		if err != nil {
 			return nil, err
 		}
+		return cfg, nil
 	}
 
 	if _, err := os.Stat(repoDir + utils.PathSeparator + "driftive.yml"); err == nil {

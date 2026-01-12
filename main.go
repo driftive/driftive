@@ -85,9 +85,6 @@ func main() {
 	repo.ValidateRepoConfig(repoConfig)
 	showInitMessage(cfg, repoConfig)
 
-	if err != nil {
-		log.Fatal().Msgf("Failed to create GitHub client: %v", err)
-	}
 	scmOps, err := vcs.NewVCS(cfg, repoConfig)
 	if err != nil {
 		log.Fatal().Msgf("Failed to create VCS client: %v", err)
