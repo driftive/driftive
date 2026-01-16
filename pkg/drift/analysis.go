@@ -58,16 +58,21 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 
 	projectResults := make([]DriftProjectResult, 0)
 	driftedCount := 0
+	erroredCount := 0
 	for result := range d.results {
 		projectResults = append(projectResults, result)
 		if result.Drifted {
 			driftedCount++
+		}
+		if !result.Succeeded {
+			erroredCount++
 		}
 	}
 
 	result := DriftDetectionResult{
 		ProjectResults: projectResults,
 		TotalDrifted:   driftedCount,
+		TotalErrored:   erroredCount,
 		TotalProjects:  len(d.Projects),
 		TotalChecked:   len(d.Projects),
 		Duration:       time.Since(startTime),
