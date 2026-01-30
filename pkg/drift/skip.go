@@ -37,6 +37,7 @@ func (d *DriftDetector) handleSkipIfContainsPRChanges(analysisResult *DriftDetec
 					if fileFolder == projectFolder {
 						projectResult.SkippedDueToPR = true
 						analysisResult.TotalDrifted--
+						analysisResult.TotalSkipped++
 						log.Info().Msgf("Marking project %s as skipped due to open PR", projectResult.Project.Dir)
 						break
 					}
