@@ -15,6 +15,7 @@ type Stash struct {
 	// OpenPRChangedFiles contains the list of files changed in currently open PRs
 	OpenPRChangedFiles []string
 	OpenIssues         []*vcstypes.VCSIssue
+	OpenPrs            []*vcstypes.VCSPullRequest
 }
 
 type DriftDetector struct {
@@ -52,7 +53,7 @@ type DriftDetectionResult struct {
 }
 
 func NewDriftDetector(repoDir string, projects []models.TypedProject, cfg *config.DriftiveConfig,
-	repoConfig *repo.DriftiveRepoConfig, openIssues []*vcstypes.VCSIssue, openPRChangedFiles []string) DriftDetector {
+	repoConfig *repo.DriftiveRepoConfig, openIssues []*vcstypes.VCSIssue, openPRChangedFiles []string, openPRs []*vcstypes.VCSPullRequest) DriftDetector {
 	return DriftDetector{
 		RepoDir:    repoDir,
 		Projects:   projects,
@@ -65,6 +66,7 @@ func NewDriftDetector(repoDir string, projects []models.TypedProject, cfg *confi
 		Stash: Stash{
 			OpenPRChangedFiles: openPRChangedFiles,
 			OpenIssues:         openIssues,
+			OpenPrs:            openPRs,
 		},
 	}
 }

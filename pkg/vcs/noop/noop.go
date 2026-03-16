@@ -17,7 +17,7 @@ func (s *SCMNoop) GetAllOpenRepoIssues(ctx context.Context) ([]*vcstypes.VCSIssu
 	return make([]*vcstypes.VCSIssue, 0), nil
 }
 
-func (s *SCMNoop) GetChangedFilesForAllPRs(ctx context.Context) ([]string, error) {
+func (s *SCMNoop) GetChangedFilesForAllOpenPrs(ctx context.Context, allOpenPrs []*vcstypes.VCSPullRequest) ([]string, error) {
 	return make([]string, 0), nil
 }
 
@@ -34,5 +34,37 @@ func (s *SCMNoop) CreateIssueComment(ctx context.Context, issueNumber int) error
 }
 
 func (s *SCMNoop) CloseIssue(ctx context.Context, issueNumber int) error {
+	return nil
+}
+
+func (s *SCMNoop) GetAllOpenPRs(ctx context.Context) ([]*vcstypes.VCSPullRequest, error) {
+	return make([]*vcstypes.VCSPullRequest, 0), nil
+}
+
+func (s *SCMNoop) BranchExists(ctx context.Context, branchName string) (bool, error) {
+	return false, nil
+}
+
+func (s *SCMNoop) CreateBranch(ctx context.Context, branchName string) error {
+	return nil
+}
+
+func (s *SCMNoop) AddOrUpdateFileInBranch(ctx context.Context, branchName string, filePath string, fileContent string, exists bool, sha *string, commitMessage string) error {
+	return nil
+}
+
+func (s *SCMNoop) CreateOrUpdatePullRequest(ctx context.Context, driftivePullRequest types.GithubPullRequest, updateOnly bool) vcstypes.CreateOrUpdatePullRequestResult {
+	return vcstypes.CreateOrUpdatePullRequestResult{
+		Created:     false,
+		RateLimited: false,
+		PullRequest: nil,
+	}
+}
+
+func (s *SCMNoop) CreatePullRequestComment(ctx context.Context, pullRequestNumber int, comment string) error {
+	return nil
+}
+
+func (s *SCMNoop) ClosePullRequest(ctx context.Context, pullRequestNumber int) error {
 	return nil
 }

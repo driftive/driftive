@@ -11,6 +11,7 @@ import (
 	"driftive/pkg/notification/github"
 	"driftive/pkg/notification/slack"
 	"driftive/pkg/vcs"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -56,6 +57,17 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 			_, err := gh.Handle(ctx, analysisResult)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to update github issues/summary")
+			}
+		}
+	}
+
+	if h.repoConfig.GitHub.PullRequests.Enabled && h.driftiveConfig.GithubToken != "" && h.driftiveConfig.GithubContext != nil {
+		log.Info().Msg("Creating remediation pull requests...")
+		gh, err := github.NewGithubRemediationPullRequest(h.driftiveConfig, h.repoConfig, h.vcs)
+		if err == nil {
+			_, err := gh.Handle(ctx, analysisResult)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to create github remediation pull request")
 			}
 		}
 	}
