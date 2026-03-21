@@ -6,6 +6,7 @@ import (
 	"driftive/pkg/models"
 	"driftive/pkg/models/backend"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -536,4 +537,191 @@ func TestBuildBlockKitMessage_WithoutDashboardURL(t *testing.T) {
 			t.Error("expected no actions block when dashboard URL is empty")
 		}
 	}
+}
+
+func TestBuildBlockKitMessage_TruncatesLongProjectList(t *testing.T) {
+	// Create 100 projects with long paths to exceed the 2800 char budget
+	var projects []drift.DriftProjectResult
+	for i := 0; i < 100; i++ {
+		projects = append(projects, drift.DriftProjectResult{
+			Project: models.TypedProject{Dir: fmt.Sprintf("terraform/production/us-east-1/service-name-%03d/sub-module", i)},
+			Drifted: true,
+		})
+	}
+
+	slack := Slack{
+		DashboardURL: "https://driftive.cloud/github/myorg/myrepo/run/abc-123",
+	}
+	driftResult := drift.DriftDetectionResult{
+		ProjectResults: projects,
+		TotalProjects:  100,
+		Duration:       2 * time.Minute,
+	}
+
+	message := slack.buildBlockKitMessage(driftResult, 100)
+
+	// Find the project list section block
+	var projectListText string
+	for _, block := range message.Attachments[0].Blocks {
+		if block.Type == "section" && block.Text != nil && strings.Contains(block.Text.Text, "Affected Projects") {
+			projectListText = block.Text.Text
+		}
+	}
+
+	if projectListText == "" {
+		t.Fatal("expected to find project list section block")
+	}
+
+	// Verify text stays under Slack's limit
+	if len(projectListText) > 3000 {
+		t.Errorf("project list text exceeds 3000 chars: got %d", len(projectListText))
+	}
+
+	// Verify truncation message is present
+	if !strings.Contains(projectListText, "more project(s)") {
+		t.Error("expected truncation message in project list")
+	}
+
+	// Verify dashboard reference in truncation
+	if !strings.Contains(projectListText, "View all in the dashboard") {
+		t.Error("expected dashboard reference in truncation message")
+	}
+
+	// Verify the dashboard button still exists
+	var hasActionsBlock bool
+	var hasContextBlock bool
+	for _, block := range message.Attachments[0].Blocks {
+		if block.Type == "actions" {
+			hasActionsBlock = true
+		}
+		if block.Type == "context" {
+			hasContextBlock = true
+		}
+	}
+	if !hasActionsBlock {
+		t.Error("expected actions block (dashboard button) to still be present")
+	}
+	if !hasContextBlock {
+		t.Error("expected context footer to still be present")
+	}
+}
+
+func TestBuildBlockKitMessage_TruncationWithoutDashboardURL(t *testing.T) {
+	var projects []drift.DriftProjectResult
+	for i := 0; i < 100; i++ {
+		projects = append(projects, drift.DriftProjectResult{
+			Project: models.TypedProject{Dir: fmt.Sprintf("terraform/production/us-east-1/service-name-%03d/sub-module", i)},
+			Drifted: true,
+		})
+	}
+
+	slack := Slack{} // No dashboard URL
+	driftResult := drift.DriftDetectionResult{
+		ProjectResults: projects,
+		TotalProjects:  100,
+		Duration:       2 * time.Minute,
+	}
+
+	message := slack.buildBlockKitMessage(driftResult, 100)
+
+	var projectListText string
+	for _, block := range message.Attachments[0].Blocks {
+		if block.Type == "section" && block.Text != nil && strings.Contains(block.Text.Text, "Affected Projects") {
+			projectListText = block.Text.Text
+		}
+	}
+
+	if !strings.Contains(projectListText, "more project(s)") {
+		t.Error("expected truncation message")
+	}
+	if strings.Contains(projectListText, "dashboard") {
+		t.Error("expected no dashboard reference when DashboardURL is empty")
+	}
+}
+
+func TestBuildBlockKitMessage_NoTruncationWhenFewProjects(t *testing.T) {
+	projects := []drift.DriftProjectResult{
+		{Project: models.TypedProject{Dir: "terraform/vpc"}, Drifted: true},
+		{Project: models.TypedProject{Dir: "terraform/rds"}, Drifted: true},
+		{Project: models.TypedProject{Dir: "terraform/s3"}, Drifted: true},
+	}
+
+	slack := Slack{}
+	driftResult := drift.DriftDetectionResult{
+		ProjectResults: projects,
+		TotalProjects:  3,
+		Duration:       1 * time.Minute,
+	}
+
+	message := slack.buildBlockKitMessage(driftResult, 3)
+
+	var projectListText string
+	for _, block := range message.Attachments[0].Blocks {
+		if block.Type == "section" && block.Text != nil && strings.Contains(block.Text.Text, "Affected Projects") {
+			projectListText = block.Text.Text
+		}
+	}
+
+	if strings.Contains(projectListText, "more project(s)") {
+		t.Error("expected no truncation for few projects")
+	}
+	for _, p := range projects {
+		if !strings.Contains(projectListText, p.Project.Dir) {
+			t.Errorf("expected project %s to be listed", p.Project.Dir)
+		}
+	}
+}
+
+func TestBuildBlockKitMessage_TruncationCountAccuracy(t *testing.T) {
+	totalProjects := 50
+	var projects []drift.DriftProjectResult
+	for i := 0; i < totalProjects; i++ {
+		projects = append(projects, drift.DriftProjectResult{
+			Project: models.TypedProject{Dir: fmt.Sprintf("terraform/production/us-east-1/service-name-%03d/sub-module", i)},
+			Drifted: true,
+		})
+	}
+
+	slack := Slack{}
+	driftResult := drift.DriftDetectionResult{
+		ProjectResults: projects,
+		TotalProjects:  totalProjects,
+		Duration:       1 * time.Minute,
+	}
+
+	message := slack.buildBlockKitMessage(driftResult, totalProjects)
+
+	var projectListText string
+	for _, block := range message.Attachments[0].Blocks {
+		if block.Type == "section" && block.Text != nil && strings.Contains(block.Text.Text, "Affected Projects") {
+			projectListText = block.Text.Text
+		}
+	}
+
+	// Count displayed projects (bullet points)
+	displayed := strings.Count(projectListText, "• `")
+
+	// Parse truncated count from "...and X more project(s)"
+	var truncated int
+	if strings.Contains(projectListText, "more project(s)") {
+		fmt.Sscanf(extractTruncatedCount(projectListText), "%d", &truncated)
+	}
+
+	if displayed+truncated != totalProjects {
+		t.Errorf("displayed (%d) + truncated (%d) = %d, want %d", displayed, truncated, displayed+truncated, totalProjects)
+	}
+}
+
+func extractTruncatedCount(text string) string {
+	// Find "...and X more" and extract X
+	idx := strings.Index(text, "...and ")
+	if idx == -1 {
+		return "0"
+	}
+	rest := text[idx+len("...and "):]
+	spaceIdx := strings.Index(rest, " ")
+	if spaceIdx == -1 {
+		return "0"
+	}
+	return rest[:spaceIdx]
 }

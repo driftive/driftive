@@ -22,6 +22,11 @@ const (
 	colorSuccess = "#38A169" // Green for all resolved
 )
 
+// maxProjectListChars is the safe character budget for the project list
+// section text. Slack's limit is 3000 chars per section text field;
+// we reserve headroom for the header line and truncation suffix.
+const maxProjectListChars = 2800
+
 // Slack Block Kit types
 type slackTextObject struct {
 	Type string `json:"type"`
@@ -134,14 +139,31 @@ func (slack Slack) buildBlockKitMessage(driftResult drift.DriftDetectionResult, 
 			Type: "divider",
 		})
 
-		// Build project list
+		// Collect drifted project dirs
+		var driftedDirs []string
+		for _, project := range driftResult.ProjectResults {
+			if project.Drifted && !project.SkippedDueToPR {
+				driftedDirs = append(driftedDirs, project.Project.Dir)
+			}
+		}
+
+		// Build project list with truncation to stay within Slack's section text limit
 		var projectList strings.Builder
 		projectList.WriteString("*Affected Projects:*\n")
 
-		for _, project := range driftResult.ProjectResults {
-			if project.Drifted && !project.SkippedDueToPR {
-				fmt.Fprintf(&projectList, "• `%s`\n", project.Project.Dir)
+		for i, dir := range driftedDirs {
+			line := fmt.Sprintf("• `%s`\n", dir)
+			remaining := len(driftedDirs) - i
+
+			// Check if adding this line would exceed the budget,
+			// accounting for a potential truncation suffix
+			truncationSuffix := slack.buildTruncationSuffix(remaining)
+			if projectList.Len()+len(line)+len(truncationSuffix) > maxProjectListChars {
+				projectList.WriteString(truncationSuffix)
+				break
 			}
+
+			projectList.WriteString(line)
 		}
 
 		blocks = append(blocks, slackBlock{
@@ -246,4 +268,14 @@ func countNonSkippedDrifts(driftResult drift.DriftDetectionResult) int {
 
 func didResolveIssues(state *backend.DriftIssuesState) bool {
 	return state != nil && state.StateUpdated && state.NumResolvedIssues > 0
+}
+
+func (slack Slack) buildTruncationSuffix(remaining int) string {
+	if remaining <= 0 {
+		return ""
+	}
+	if slack.DashboardURL != "" {
+		return fmt.Sprintf("_...and %d more project(s). View all in the dashboard._\n", remaining)
+	}
+	return fmt.Sprintf("_...and %d more project(s)_\n", remaining)
 }
