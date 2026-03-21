@@ -149,7 +149,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 	for _, project := range allDriftiveOpenIssues {
 		if project.Kind == types.DriftIssueKind {
 			for _, projectResult := range driftResult.ProjectResults {
-				if !projectResult.Drifted && project.Project.Dir == projectResult.Project.Dir {
+				if !projectResult.Drifted && projectResult.Succeeded && project.Project.Dir == projectResult.Project.Dir {
 					closeableDriftIssues = append(closeableDriftIssues, project)
 				}
 			}
@@ -167,7 +167,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 		}
 	}
 
-	closedDriftIssues := g.closeIssues(ctx, closeableDriftIssues)
+	closedDriftIssues := g.closeIssues(ctx, closeableDriftIssues, g.repoConfig.GitHub.Issues.CloseResolved)
 	log.Info().Msgf("Closed %d state-drifted issues", len(closedDriftIssues))
 	numOpenDriftIssues = numOpenDriftIssues - len(closedDriftIssues)
 	var newlyCreatedIssues []types.ProjectIssue
@@ -213,7 +213,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 		}
 	}
 
-	closedErrorIssues := g.closeIssues(ctx, closeableErrorIssues)
+	closedErrorIssues := g.closeIssues(ctx, closeableErrorIssues, g.repoConfig.GitHub.Issues.Errors.CloseResolved)
 	log.Info().Msgf("Closed %d errored issues", len(closedErrorIssues))
 	numOpenErrorIssues = numOpenErrorIssues - len(closedErrorIssues)
 
@@ -283,7 +283,7 @@ func getProjectIssuesFromGHIssueBodies(ghIssues []*vcstypes.VCSIssue) []types.Pr
 	for _, issue := range ghIssues {
 		project, err := getProjectFromIssueBody(issue.Body)
 		if err != nil {
-			log.Warn().Err(err).Msgf("Failed to get project name from issue metadata. Issue title: %s", issue.Title)
+			log.Debug().Err(err).Msgf("Failed to get project name from issue metadata. Issue title: %s", issue.Title)
 			continue
 		}
 
@@ -323,8 +323,8 @@ func getProjectFromIssueBody(body string) (*types.GHProject, error) {
 	return &project, nil
 }
 
-func (g *GithubIssueNotification) closeIssues(ctx context.Context, issues []types.ProjectIssue) []types.ProjectIssue {
-	if !g.repoConfig.GitHub.Issues.CloseResolved && len(issues) > 0 {
+func (g *GithubIssueNotification) closeIssues(ctx context.Context, issues []types.ProjectIssue, closeResolved bool) []types.ProjectIssue {
+	if !closeResolved && len(issues) > 0 {
 		log.Warn().Msg("Note: There are GH drift issues but driftive is not configured to close them.")
 		return []types.ProjectIssue{}
 	}

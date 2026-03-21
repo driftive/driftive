@@ -59,7 +59,11 @@ func (g *GHOps) GetAllOpenRepoIssues(ctx context.Context) ([]*vcstypes.VCSIssue,
 			return nil, err
 		}
 
-		openIssues = append(openIssues, issues...)
+		for _, issue := range issues {
+			if !issue.IsPullRequest() {
+				openIssues = append(openIssues, issue)
+			}
+		}
 
 		if resp.NextPage == 0 {
 			break
