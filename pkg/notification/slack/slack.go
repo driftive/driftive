@@ -140,7 +140,7 @@ func (slack Slack) buildBlockKitMessage(driftResult drift.DriftDetectionResult, 
 
 		for _, project := range driftResult.ProjectResults {
 			if project.Drifted && !project.SkippedDueToPR {
-				projectList.WriteString(fmt.Sprintf("• `%s`\n", project.Project.Dir))
+				fmt.Fprintf(&projectList, "• `%s`\n", project.Project.Dir)
 			}
 		}
 
