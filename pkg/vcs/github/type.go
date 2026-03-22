@@ -3,7 +3,7 @@ package github
 import (
 	"driftive/pkg/config"
 	"driftive/pkg/config/repo"
-	"github.com/google/go-github/v81/github"
+	"github.com/google/go-github/v84/github"
 )
 
 type GHOps struct {

@@ -2,7 +2,7 @@ package ghutils
 
 import (
 	"errors"
-	"github.com/google/go-github/v81/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/rs/zerolog/log"
 )
 
