@@ -5,7 +5,9 @@ import (
 	"driftive/pkg/drift"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"resty.dev/v3"
 )
@@ -28,14 +30,31 @@ func NewDriftiveNotification(url, token string) Driftive {
 	}
 }
 
-// Handle sends drift analysis results to the Driftive API and returns the dashboard URL if available
+// Handle sends drift analysis results to the Driftive API and returns the dashboard URL if available.
+// Transient failures (network errors, 5xx, 429) are retried with exponential backoff. The same
+// Idempotency-Key is sent on every attempt so a retry of a request the server already accepted
+// returns the existing run instead of creating a duplicate.
 func (d Driftive) Handle(ctx context.Context, driftResult drift.DriftDetectionResult) (*AnalysisResponse, error) {
-	client := resty.New()
+	idemKey := uuid.NewString()
+
+	client := resty.New().
+		SetTimeout(30 * time.Second).
+		SetRetryCount(3).
+		SetRetryWaitTime(2 * time.Second).
+		SetRetryMaxWaitTime(15 * time.Second).
+		AddRetryConditions(func(res *resty.Response, err error) bool {
+			if err != nil {
+				return true
+			}
+			sc := res.StatusCode()
+			return sc == 429 || sc >= 500
+		})
 	defer client.Close()
 
 	res, err := client.R().
 		WithContext(ctx).
 		SetHeader("X-Token", d.Token).
+		SetHeader("Idempotency-Key", idemKey).
 		SetBody(driftResult).
 		Post(d.Url + "/api/v1/drift_analysis")
 
@@ -44,7 +63,11 @@ func (d Driftive) Handle(ctx context.Context, driftResult drift.DriftDetectionRe
 	}
 
 	if res.StatusCode() != 200 {
-		log.Error().Msgf("Failed to send drift analysis result to driftive api. Invalid token?. Response: %v", res.String())
+		if res.StatusCode() == 401 || res.StatusCode() == 403 {
+			log.Error().Msgf("Driftive API rejected token (status %d). Response: %s", res.StatusCode(), res.String())
+		} else {
+			log.Error().Msgf("Driftive API returned non-200 (status %d) after retries. Response: %s", res.StatusCode(), res.String())
+		}
 		return nil, fmt.Errorf("failed to send drift analysis result: %s", res.String())
 	}
 
