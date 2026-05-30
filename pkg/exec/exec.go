@@ -12,8 +12,8 @@ import (
 
 type Executor interface {
 	Dir() string
-	Init(args ...string) (string, error)
-	Plan(args ...string) (string, error)
+	Init(ctx context.Context, args ...string) (string, error)
+	Plan(ctx context.Context, args ...string) (string, error)
 	ParsePlan(output string) string
 	ParseErrorOutput(output string) string
 }

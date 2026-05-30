@@ -10,12 +10,12 @@ func (t TerragruntExecutor) Dir() string {
 	return t.dir
 }
 
-func (t TerragruntExecutor) Init(args ...string) (string, error) {
-	return RunCommandInDir(context.Background(), t.Dir(), "terragrunt", append([]string{"init"}, args...)...)
+func (t TerragruntExecutor) Init(ctx context.Context, args ...string) (string, error) {
+	return RunCommandInDir(ctx, t.Dir(), "terragrunt", append([]string{"init"}, args...)...)
 }
 
-func (t TerragruntExecutor) Plan(args ...string) (string, error) {
-	return RunCommandInDir(context.Background(), t.Dir(), "terragrunt", append([]string{"plan"}, args...)...)
+func (t TerragruntExecutor) Plan(ctx context.Context, args ...string) (string, error) {
+	return RunCommandInDir(ctx, t.Dir(), "terragrunt", append([]string{"plan"}, args...)...)
 }
 
 func (t TerragruntExecutor) ParsePlan(output string) string {
