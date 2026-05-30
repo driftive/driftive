@@ -66,9 +66,12 @@ func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfi
 	return allOpenIssues, changedFiles
 }
 
+// version is overridden at release time via -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
-	cfg := config.ParseConfig()
+	cfg := config.ParseConfig(version)
 	ctx := context.Background()
 
 	repoDir, shouldDelete := determineRepositoryDir(ctx, cfg.RepositoryUrl, cfg.RepositoryPath, cfg.Branch)
