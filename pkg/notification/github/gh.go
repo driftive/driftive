@@ -20,7 +20,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/google/go-github/v85/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/rs/zerolog/log"
 )
 
@@ -120,7 +120,12 @@ func (g *GithubIssueNotification) Handle(ctx context.Context, analysisResult dri
 
 	log.Info().Msgf("Github issues updated")
 	if g.repoConfig.GitHub.Summary.Enabled {
-		summary.NewGithubSummaryHandler(g.config, g.repoConfig, allOpenIssues).UpdateSummary(ctx, state)
+		summaryHandler, err := summary.NewGithubSummaryHandler(g.config, g.repoConfig, allOpenIssues)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to create github summary handler")
+		} else {
+			summaryHandler.UpdateSummary(ctx, state)
+		}
 	} else {
 		log.Info().Msg("Github summary is disabled. Skipping summary update")
 	}

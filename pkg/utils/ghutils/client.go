@@ -2,7 +2,7 @@ package ghutils
 
 import (
 	"errors"
-	"github.com/google/go-github/v85/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/rs/zerolog/log"
 )
 
@@ -16,6 +16,5 @@ func GitHubClient(githubToken string) (*github.Client, error) {
 		return nil, errors.New(ErrGHTokenNotProvided)
 	}
 
-	ghClient := github.NewClient(nil).WithAuthToken(githubToken)
-	return ghClient, nil
+	return github.NewClient(github.WithAuthToken(githubToken))
 }
