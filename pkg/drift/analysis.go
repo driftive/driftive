@@ -12,12 +12,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (d *DriftDetector) detectDriftConcurrently(project models.TypedProject, projectDir string) {
+func (d *DriftDetector) detectDriftConcurrently(ctx context.Context, project models.TypedProject, projectDir string) {
 	defer func() {
 		<-d.semaphore
 	}()
 	defer d.workerWg.Done()
-	result, err := d.detectDrift(project)
+	result, err := d.detectDrift(ctx, project)
 	if err != nil {
 		log.Info().Msgf("Error checking drift in %s: %v", project.Dir, err)
 	}
@@ -46,11 +46,18 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 			continue
 		}
 
+		// Honor cancellation between projects so an interrupted run doesn't keep
+		// spinning up new terraform/tofu processes after Ctrl-C.
+		if ctx.Err() != nil {
+			log.Info().Msgf("Drift analysis cancelled after %d/%d projects: %v", idx, len(d.Projects), ctx.Err())
+			break
+		}
+
 		totalChecked++
 		log.Info().Msgf("Checking drift in project %d/%d: %s (%s)", idx+1, len(d.Projects), projectDir, models.ProjectTypeToStr(proj.Type))
 		d.workerWg.Add(1)
 		d.semaphore <- struct{}{}
-		go d.detectDriftConcurrently(proj, projectDir)
+		go d.detectDriftConcurrently(ctx, proj, projectDir)
 	}
 
 	d.workerWg.Wait()
@@ -85,16 +92,16 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 	return result
 }
 
-func (d *DriftDetector) detectDrift(project models.TypedProject) (DriftProjectResult, error) {
+func (d *DriftDetector) detectDrift(ctx context.Context, project models.TypedProject) (DriftProjectResult, error) {
 	executor := exec.NewExecutor(project.Dir, project.Type)
-	output, err := executor.Init("-upgrade", "-lock=false", "-no-color")
+	output, err := executor.Init(ctx, "-upgrade", "-lock=false", "-no-color")
 
 	if err != nil {
 		log.Info().Msgf("Error running init command in %s: %v", project.Dir, err)
 		log.Info().Msg(output)
 		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false, InitOutput: output, PlanOutput: ""}, err
 	}
-	output, err = executor.Plan("-lock=false", "-no-color")
+	output, err = executor.Plan(ctx, "-lock=false", "-no-color")
 	if err != nil {
 		log.Info().Msgf("Error running plan command in %s: %v", project.Dir, err)
 		log.Info().Msg(output)
