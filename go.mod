@@ -3,7 +3,7 @@ module driftive
 go 1.25.0
 
 require (
-	github.com/google/go-github/v85 v85.0.0
+	github.com/google/go-github/v88 v88.0.0
 	github.com/google/uuid v1.6.0
 	github.com/moby/patternmatcher v0.6.1
 	github.com/rs/zerolog v1.35.1

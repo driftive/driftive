@@ -10,7 +10,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-github/v85/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/rs/zerolog/log"
 	"strings"
 	"text/template"
@@ -37,14 +37,17 @@ type GithubSummaryHandler struct {
 func NewGithubSummaryHandler(
 	config *config.DriftiveConfig,
 	repoConfig *repo.DriftiveRepoConfig,
-	allOpenIssues []*vcstypes.VCSIssue) *GithubSummaryHandler {
-	ghClient := github.NewClient(nil).WithAuthToken(config.GithubToken)
+	allOpenIssues []*vcstypes.VCSIssue) (*GithubSummaryHandler, error) {
+	ghClient, err := github.NewClient(github.WithAuthToken(config.GithubToken))
+	if err != nil {
+		return nil, err
+	}
 	return &GithubSummaryHandler{
 		config:        config,
 		repoConfig:    repoConfig,
 		ghClient:      ghClient,
 		allOpenIssues: allOpenIssues,
-	}
+	}, nil
 }
 
 func getSummaryIssueBody(summary GithubSummary) (*string, error) {
