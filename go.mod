@@ -8,7 +8,7 @@ require (
 	github.com/moby/patternmatcher v0.6.1
 	github.com/rs/zerolog v1.35.1
 	gopkg.in/yaml.v3 v3.0.1
-	resty.dev/v3 v3.0.0-rc.1
+	resty.dev/v3 v3.0.0-rc.2
 )
 
 require (
