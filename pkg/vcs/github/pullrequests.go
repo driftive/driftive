@@ -102,6 +102,7 @@ func (g *GHOps) GetChangedFiles(ctx context.Context, prNumber int) ([]string, er
 		if filesResp.NextPage == 0 {
 			break
 		}
+		opts.Page = filesResp.NextPage
 	}
 
 	return allFiles, nil
