@@ -2,9 +2,7 @@ package drift
 
 import (
 	"context"
-	"driftive/pkg/exec"
 	"driftive/pkg/models"
-	"driftive/pkg/utils"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,7 +22,24 @@ func (d *DriftDetector) detectDriftConcurrently(ctx context.Context, project mod
 	if result.Drifted {
 		log.Info().Msgf("Drift detected in project %s", projectDir)
 	}
+	// Report the repo-relative dir rather than the discovered path, which carries whatever
+	// prefix --repo-path had (or the temp clone dir under --repo-url). Must happen after
+	// detectDrift, which uses project.Dir as the subprocess working directory.
+	result.Project.Dir = projectDir
 	d.results <- result
+}
+
+// relativeProjectDir returns proj relative to the repository root. The repo root itself is
+// reported as ".".
+func relativeProjectDir(repoDir, projectDir string) string {
+	rel, err := filepath.Rel(repoDir, projectDir)
+	if err != nil {
+		return projectDir
+	}
+	if rel == "" {
+		return "."
+	}
+	return rel
 }
 
 func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
@@ -40,11 +55,7 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 	startTime := time.Now()
 
 	for idx, proj := range d.Projects {
-		projectDir := strings.TrimPrefix(strings.ReplaceAll(proj.Dir, d.RepoDir, ""), utils.PathSeparator)
-
-		if projectDir == "" {
-			continue
-		}
+		projectDir := relativeProjectDir(d.RepoDir, proj.Dir)
 
 		// Honor cancellation between projects so an interrupted run doesn't keep
 		// spinning up new terraform/tofu processes after Ctrl-C.
@@ -81,7 +92,7 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 		TotalDrifted:   driftedCount,
 		TotalErrored:   erroredCount,
 		TotalProjects:  len(d.Projects),
-		TotalChecked:   len(d.Projects),
+		TotalChecked:   totalChecked,
 		Duration:       time.Since(startTime),
 	}
 
@@ -93,7 +104,7 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 }
 
 func (d *DriftDetector) detectDrift(ctx context.Context, project models.TypedProject) (DriftProjectResult, error) {
-	executor := exec.NewExecutor(project.Dir, project.Type)
+	executor := d.newExecutor(project.Dir, project.Type)
 	output, err := executor.Init(ctx, "-upgrade", "-lock=false", "-no-color")
 
 	if err != nil {

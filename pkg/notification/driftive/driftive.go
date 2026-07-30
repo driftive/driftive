@@ -40,6 +40,10 @@ func (d Driftive) Handle(ctx context.Context, driftResult drift.DriftDetectionRe
 	client := resty.New().
 		SetTimeout(30 * time.Second).
 		SetRetryCount(3).
+		// resty only retries idempotent methods unless told otherwise, so without this the
+		// retry count and conditions below never apply to this POST. The Idempotency-Key
+		// sent on every attempt is what makes retrying it safe.
+		SetRetryAllowNonIdempotent(true).
 		SetRetryWaitTime(2 * time.Second).
 		SetRetryMaxWaitTime(15 * time.Second).
 		AddRetryConditions(func(res *resty.Response, err error) bool {

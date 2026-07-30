@@ -3,6 +3,7 @@ package drift
 import (
 	"driftive/pkg/config"
 	"driftive/pkg/config/repo"
+	"driftive/pkg/exec"
 	"driftive/pkg/models"
 	"driftive/pkg/utils"
 	"driftive/pkg/vcs/vcstypes"
@@ -26,6 +27,10 @@ type DriftDetector struct {
 	workerWg  sync.WaitGroup
 	results   chan DriftProjectResult
 	semaphore chan struct{}
+
+	// newExecutor builds the executor for a project. Defaults to exec.NewExecutor; tests
+	// substitute a fake so DetectDrift can run without terraform/tofu installed.
+	newExecutor func(dir string, t models.ProjectType) exec.Executor
 
 	Stash Stash
 }
@@ -54,13 +59,14 @@ type DriftDetectionResult struct {
 func NewDriftDetector(repoDir string, projects []models.TypedProject, cfg *config.DriftiveConfig,
 	repoConfig *repo.DriftiveRepoConfig, openIssues []*vcstypes.VCSIssue, openPRChangedFiles []string) DriftDetector {
 	return DriftDetector{
-		RepoDir:    repoDir,
-		Projects:   projects,
-		Config:     cfg,
-		RepoConfig: repoConfig,
-		workerWg:   sync.WaitGroup{},
-		results:    nil,
-		semaphore:  make(chan struct{}, utils.Max(1, cfg.Concurrency)),
+		RepoDir:     repoDir,
+		Projects:    projects,
+		Config:      cfg,
+		RepoConfig:  repoConfig,
+		workerWg:    sync.WaitGroup{},
+		results:     nil,
+		semaphore:   make(chan struct{}, utils.Max(1, cfg.Concurrency)),
+		newExecutor: exec.NewExecutor,
 
 		Stash: Stash{
 			OpenPRChangedFiles: openPRChangedFiles,
