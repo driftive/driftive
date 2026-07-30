@@ -14,7 +14,9 @@ type Project struct {
 
 // TypedProject represents a TF/Tofu/Terragrunt project to be analyzed
 type TypedProject struct {
-	// Dir is the relative path to the project
+	// Dir is the discovered path to the project, carrying whatever prefix --repo-path had
+	// (or the temp clone dir under --repo-url). It is used as the subprocess working
+	// directory. Results report it relative to the repository root instead.
 	Dir  string      `json:"dir" yaml:"dir"`
 	Type ProjectType `json:"type" yaml:"type"`
 }
