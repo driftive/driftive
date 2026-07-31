@@ -32,6 +32,14 @@ type DriftDetector struct {
 	// substitute a fake so DetectDrift can run without terraform/tofu installed.
 	newExecutor func(dir string, t models.ProjectType) exec.Executor
 
+	// OnProjectStart receives the repo-relative dir when a project's analysis begins.
+	// OnProjectDone receives the finished result, whose Project.Dir is the same repo-relative
+	// string. Both are optional; when nil the scan behaves exactly as if they did not exist.
+	// Called from worker goroutines, so an implementation must be safe for concurrent use and
+	// must not block — anything slow here serializes the scan.
+	OnProjectStart func(dir string)
+	OnProjectDone  func(result DriftProjectResult)
+
 	Stash Stash
 }
 

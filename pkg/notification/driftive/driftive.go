@@ -21,12 +21,16 @@ type AnalysisResponse struct {
 type Driftive struct {
 	Url   string
 	Token string
+	// RunKey is the Idempotency-Key identifying this CLI run. The live reporter sends the same
+	// key, which is what lets this terminal upload complete the run it has been filling in.
+	RunKey string
 }
 
-func NewDriftiveNotification(url, token string) Driftive {
+func NewDriftiveNotification(url, token, runKey string) Driftive {
 	return Driftive{
-		Url:   url,
-		Token: token,
+		Url:    url,
+		Token:  token,
+		RunKey: runKey,
 	}
 }
 
@@ -35,7 +39,10 @@ func NewDriftiveNotification(url, token string) Driftive {
 // Idempotency-Key is sent on every attempt so a retry of a request the server already accepted
 // returns the existing run instead of creating a duplicate.
 func (d Driftive) Handle(ctx context.Context, driftResult drift.DriftDetectionResult) (*AnalysisResponse, error) {
-	idemKey := uuid.NewString()
+	idemKey := d.RunKey
+	if idemKey == "" {
+		idemKey = uuid.NewString()
+	}
 
 	client := resty.New().
 		SetTimeout(30 * time.Second).

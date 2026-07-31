@@ -6,6 +6,8 @@ import (
 	"driftive/pkg/config/repo"
 	"driftive/pkg/exec"
 	"driftive/pkg/models"
+	"slices"
+	"sort"
 	"sync"
 	"testing"
 )
@@ -164,6 +166,81 @@ func TestDetectDriftTotalCheckedReflectsCancellation(t *testing.T) {
 	}
 	if result.TotalChecked != 0 {
 		t.Errorf("expected TotalChecked 0 for a scan cancelled before any project ran, got %d", result.TotalChecked)
+	}
+}
+
+// TestDetectDriftReportsProgress covers the live-reporting callbacks. The key assertion is that
+// the dir handed to OnProjectStart matches the one on the finished result: the server upserts on
+// (run, dir), so if the two disagreed — start reporting the discovered path and done the
+// repo-relative one — nothing would deduplicate and every project would produce two rows.
+func TestDetectDriftReportsProgress(t *testing.T) {
+	repoDir := "/var/folders/tmp/driftive456"
+	projects := []models.TypedProject{
+		{Dir: repoDir + "/infra/a", Type: models.Terraform},
+		{Dir: repoDir + "/infra/b", Type: models.Terraform},
+	}
+	d, _ := newTestDetector(repoDir, projects, noDriftOutput)
+
+	var mu sync.Mutex
+	started := make([]string, 0)
+	finished := make([]string, 0)
+	d.OnProjectStart = func(dir string) {
+		mu.Lock()
+		defer mu.Unlock()
+		started = append(started, dir)
+	}
+	d.OnProjectDone = func(result DriftProjectResult) {
+		mu.Lock()
+		defer mu.Unlock()
+		finished = append(finished, result.Project.Dir)
+	}
+
+	result := d.DetectDrift(context.Background())
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(started) != 2 {
+		t.Errorf("expected OnProjectStart once per project, got %d call(s): %v", len(started), started)
+	}
+	if len(finished) != 2 {
+		t.Errorf("expected OnProjectDone once per project, got %d call(s): %v", len(finished), finished)
+	}
+
+	// Both callbacks must agree, and both must be repo-relative.
+	sort.Strings(started)
+	sort.Strings(finished)
+	want := []string{"infra/a", "infra/b"}
+	if !slices.Equal(started, want) {
+		t.Errorf("OnProjectStart dirs = %v, want %v", started, want)
+	}
+	if !slices.Equal(finished, started) {
+		t.Errorf("callbacks disagree on the dir: start=%v done=%v", started, finished)
+	}
+
+	// And they must match what the terminal upload will send.
+	reported := resultDirs(result)
+	sort.Strings(reported)
+	if !slices.Equal(reported, started) {
+		t.Errorf("progress dirs %v disagree with the final result dirs %v", started, reported)
+	}
+}
+
+// TestDetectDriftWithoutCallbacksIsUnaffected is the "API is optional" case: with both callbacks
+// nil the scan must run exactly as before, with no panic.
+func TestDetectDriftWithoutCallbacksIsUnaffected(t *testing.T) {
+	projects := []models.TypedProject{
+		{Dir: "infra/a", Type: models.Terraform},
+	}
+	d, _ := newTestDetector(".", projects, noDriftOutput)
+
+	if d.OnProjectStart != nil || d.OnProjectDone != nil {
+		t.Fatal("callbacks must default to nil so the scan path stays independent of the API")
+	}
+
+	result := d.DetectDrift(context.Background())
+	if len(result.ProjectResults) != 1 {
+		t.Errorf("expected 1 result with no callbacks wired, got %d", len(result.ProjectResults))
 	}
 }
 

@@ -18,13 +18,17 @@ type NotificationHandler struct {
 	repoConfig     *repo.DriftiveRepoConfig
 	driftiveConfig *config.DriftiveConfig
 	vcs            vcs.VCS
+	// runKey is the Idempotency-Key for this CLI run, shared with the live reporter so the
+	// terminal upload completes the run the reporter has been filling in.
+	runKey string
 }
 
-func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig, vcs vcs.VCS) *NotificationHandler {
+func NewNotificationHandler(driftiveConfig *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig, vcs vcs.VCS, runKey string) *NotificationHandler {
 	return &NotificationHandler{
 		repoConfig:     repoConfig,
 		driftiveConfig: driftiveConfig,
 		vcs:            vcs,
+		runKey:         runKey,
 	}
 }
 
@@ -51,9 +55,9 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 
 	// Send to Driftive API first to get the dashboard URL for other notifications
 	var dashboardURL string
-	if h.driftiveConfig.DriftiveToken != "" && h.driftiveConfig.DriftiveApiUrl != "" {
+	if h.driftiveConfig.DriftiveAPIEnabled() {
 		log.Info().Msg("Sending notification to driftive api...")
-		driftiveApiNotification := driftive.NewDriftiveNotification(h.driftiveConfig.DriftiveApiUrl, h.driftiveConfig.DriftiveToken)
+		driftiveApiNotification := driftive.NewDriftiveNotification(h.driftiveConfig.DriftiveApiUrl, h.driftiveConfig.DriftiveToken, h.runKey)
 		response, err := driftiveApiNotification.Handle(ctx, analysisResult)
 		if err != nil {
 			driftiveStatus = notifierFailed
