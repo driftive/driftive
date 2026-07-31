@@ -53,7 +53,7 @@ func TestHandle_SendsPayloadAndHeaders(t *testing.T) {
 	}))
 	defer server.Close()
 
-	d := NewDriftiveNotification(server.URL, "secret-token")
+	d := NewDriftiveNotification(server.URL, "secret-token", "shared-run-key")
 	resp, err := d.Handle(context.Background(), sampleResult())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -65,8 +65,10 @@ func TestHandle_SendsPayloadAndHeaders(t *testing.T) {
 	if gotToken != "secret-token" {
 		t.Errorf("expected X-Token 'secret-token', got %q", gotToken)
 	}
-	if gotKey == "" {
-		t.Error("expected a non-empty Idempotency-Key header")
+	// The run key must reach the API verbatim: it is what lets this terminal upload complete the
+	// RUNNING run the live reporter created under the same key, instead of starting a second one.
+	if gotKey != "shared-run-key" {
+		t.Errorf("expected Idempotency-Key 'shared-run-key', got %q", gotKey)
 	}
 	if resp == nil || resp.DashboardURL != "http://dash/run/abc" {
 		t.Errorf("expected the dashboard URL to be parsed, got %+v", resp)
@@ -93,7 +95,7 @@ func TestHandle_ReturnsErrorOnNon200(t *testing.T) {
 	}))
 	defer server.Close()
 
-	d := NewDriftiveNotification(server.URL, "secret-token")
+	d := NewDriftiveNotification(server.URL, "secret-token", "run-key")
 	resp, err := d.Handle(context.Background(), sampleResult())
 	if err == nil {
 		t.Fatal("expected an error for a 400 response")
@@ -112,7 +114,7 @@ func TestHandle_ReturnsErrorOnUnreachableServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	d := NewDriftiveNotification("http://127.0.0.1:59999", "secret-token")
+	d := NewDriftiveNotification("http://127.0.0.1:59999", "secret-token", "run-key")
 	if _, err := d.Handle(ctx, sampleResult()); err == nil {
 		t.Error("expected an error when the API is unreachable")
 	}
@@ -144,7 +146,7 @@ func TestHandle_ReusesIdempotencyKeyAcrossRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	d := NewDriftiveNotification(server.URL, "secret-token")
+	d := NewDriftiveNotification(server.URL, "secret-token", "retry-run-key")
 	if _, err := d.Handle(context.Background(), sampleResult()); err != nil {
 		t.Fatalf("expected the retry to succeed, got %v", err)
 	}

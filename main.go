@@ -8,11 +8,13 @@ import (
 	"driftive/pkg/drift"
 	"driftive/pkg/git"
 	"driftive/pkg/notification"
+	"driftive/pkg/notification/driftive"
 	"driftive/pkg/vcs"
 	"driftive/pkg/vcs/vcstypes"
 	"errors"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -69,6 +71,22 @@ func prepareStash(ctx context.Context, scmOps vcs.VCS, cfg *config.DriftiveConfi
 // version is overridden at release time via -ldflags "-X main.version=...".
 var version = "dev"
 
+// startLiveReporter wires live progress reporting onto the detector, under the same gate as the
+// terminal upload. Returns nil when the Driftive API is not configured, in which case the scan
+// makes no network calls and behaves exactly as before.
+func startLiveReporter(ctx context.Context, cfg *config.DriftiveConfig, detector *drift.DriftDetector, runKey string, totalProjects int) *driftive.LiveReporter {
+	if !cfg.DriftiveAPIEnabled() {
+		return nil
+	}
+
+	reporter := driftive.NewLiveReporter(cfg.DriftiveApiUrl, cfg.DriftiveToken, runKey, totalProjects)
+	detector.OnProjectStart = reporter.ProjectStarted
+	detector.OnProjectDone = reporter.ProjectFinished
+	reporter.Start(ctx)
+	log.Info().Msg("Live progress reporting enabled.")
+	return reporter
+}
+
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: ""})
 	cfg := config.ParseConfig(version)
@@ -98,9 +116,19 @@ func main() {
 	projects := discover.AutoDiscoverProjects(repoDir, repoConfig)
 	log.Info().Msgf("Projects detected: %d", len(projects))
 	driftDetector := drift.NewDriftDetector(repoDir, projects, cfg, repoConfig, openIssues, changedFiles)
+
+	// One key identifies this run to the API across every progress post and the terminal upload.
+	runKey := uuid.NewString()
+	liveReporter := startLiveReporter(ctx, cfg, &driftDetector, runKey, len(projects))
+
 	analysisResult := driftDetector.DetectDrift(ctx)
 
-	notification.NewNotificationHandler(cfg, repoConfig, scmOps).
+	// Stopped before the terminal upload so a progress post cannot race the finalize.
+	if liveReporter != nil {
+		liveReporter.Stop()
+	}
+
+	notification.NewNotificationHandler(cfg, repoConfig, scmOps, runKey).
 		HandleNotifications(ctx, analysisResult)
 
 	if analysisResult.TotalDrifted <= 0 {

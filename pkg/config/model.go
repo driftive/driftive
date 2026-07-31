@@ -22,3 +22,9 @@ type DriftiveConfig struct {
 	DriftiveApiUrl string `json:"api_url" yaml:"api_url"`
 	DriftiveToken  string `json:"token" yaml:"token"`
 }
+
+// DriftiveAPIEnabled reports whether the Driftive API can be reached. Live progress reporting and
+// the terminal upload share this gate so the two cannot drift apart.
+func (c *DriftiveConfig) DriftiveAPIEnabled() bool {
+	return c.DriftiveToken != "" && c.DriftiveApiUrl != ""
+}

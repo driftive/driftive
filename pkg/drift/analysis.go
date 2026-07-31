@@ -15,6 +15,13 @@ func (d *DriftDetector) detectDriftConcurrently(ctx context.Context, project mod
 		<-d.semaphore
 	}()
 	defer d.workerWg.Done()
+
+	// Reported from inside the worker, after the semaphore is acquired, so "running" reflects
+	// actual concurrency rather than the whole backlog.
+	if d.OnProjectStart != nil {
+		d.OnProjectStart(projectDir)
+	}
+
 	result, err := d.detectDrift(ctx, project)
 	if err != nil {
 		log.Info().Msgf("Error checking drift in %s: %v", project.Dir, err)
@@ -26,6 +33,12 @@ func (d *DriftDetector) detectDriftConcurrently(ctx context.Context, project mod
 	// prefix --repo-path had (or the temp clone dir under --repo-url). Must happen after
 	// detectDrift, which uses project.Dir as the subprocess working directory.
 	result.Project.Dir = projectDir
+
+	// After the dir is normalized, so both callbacks agree on it.
+	if d.OnProjectDone != nil {
+		d.OnProjectDone(result)
+	}
+
 	d.results <- result
 }
 
