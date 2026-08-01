@@ -6,8 +6,10 @@ import (
 	"driftive/pkg/config/repo"
 	"driftive/pkg/exec"
 	"driftive/pkg/models"
+	"errors"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -18,6 +20,11 @@ import (
 type fakeExecutor struct {
 	dir        string
 	planOutput string
+
+	// initOutput/initErr and planErr drive the failure paths. Zero values mean "succeeds".
+	initOutput string
+	initErr    error
+	planErr    error
 
 	mu       *sync.Mutex
 	initDirs *[]string
@@ -31,11 +38,14 @@ func (f fakeExecutor) Init(_ context.Context, _ ...string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	*f.initDirs = append(*f.initDirs, f.dir)
+	if f.initErr != nil {
+		return f.initOutput, f.initErr
+	}
 	return "init ok", nil
 }
 
 func (f fakeExecutor) Plan(_ context.Context, _ ...string) (string, error) {
-	return f.planOutput, nil
+	return f.planOutput, f.planErr
 }
 
 func (f fakeExecutor) ParsePlan(output string) string        { return output }
@@ -60,6 +70,29 @@ func newTestDetector(repoDir string, projects []models.TypedProject, planOutput 
 		return fakeExecutor{dir: dir, planOutput: planOutput, mu: &mu, initDirs: &initDirs}
 	}
 	return &d, &initDirs
+}
+
+// newFailingTestDetector wires a detector whose executor fails at init or plan.
+func newFailingTestDetector(projects []models.TypedProject, template fakeExecutor) *DriftDetector {
+	var mu sync.Mutex
+	initDirs := make([]string, 0)
+
+	d := NewDriftDetector(
+		".",
+		projects,
+		&config.DriftiveConfig{Concurrency: 1, RepositoryPath: "."},
+		&repo.DriftiveRepoConfig{},
+		nil,
+		nil,
+	)
+	d.newExecutor = func(dir string, _ models.ProjectType) exec.Executor {
+		e := template
+		e.dir = dir
+		e.mu = &mu
+		e.initDirs = &initDirs
+		return e
+	}
+	return &d
 }
 
 func resultDirs(result DriftDetectionResult) []string {
@@ -263,5 +296,95 @@ func TestDetectDriftReportsDrift(t *testing.T) {
 	}
 	if result.TotalChecked != 2 {
 		t.Errorf("expected TotalChecked 2, got %d", result.TotalChecked)
+	}
+}
+
+func TestDetectDriftRecordsInitFailurePhase(t *testing.T) {
+	projects := []models.TypedProject{{Dir: "infra/a", Type: models.Terraform}}
+	d := newFailingTestDetector(projects, fakeExecutor{
+		initOutput: "Error: Failed to install provider",
+		initErr:    errors.New("exit status 1"),
+	})
+
+	result := d.DetectDrift(context.Background())
+
+	got := result.ProjectResults[0]
+	if got.Succeeded {
+		t.Fatal("expected the project to be marked as failed")
+	}
+	if got.FailedPhase != PhaseInit {
+		t.Errorf("FailedPhase = %q, want %q", got.FailedPhase, PhaseInit)
+	}
+	if got.InitOutput != "Error: Failed to install provider" {
+		t.Errorf("InitOutput = %q, want the init output preserved", got.InitOutput)
+	}
+	if result.TotalErrored != 1 {
+		t.Errorf("TotalErrored = %d, want 1", result.TotalErrored)
+	}
+}
+
+func TestDetectDriftRecordsPlanFailurePhase(t *testing.T) {
+	projects := []models.TypedProject{{Dir: "infra/a", Type: models.Terraform}}
+	d := newFailingTestDetector(projects, fakeExecutor{
+		planOutput: "Planning failed.",
+		planErr:    errors.New("exit status 1"),
+	})
+
+	result := d.DetectDrift(context.Background())
+
+	got := result.ProjectResults[0]
+	if got.Succeeded {
+		t.Fatal("expected the project to be marked as failed")
+	}
+	if got.FailedPhase != PhasePlan {
+		t.Errorf("FailedPhase = %q, want %q", got.FailedPhase, PhasePlan)
+	}
+	if got.PlanOutput != "Planning failed." {
+		t.Errorf("PlanOutput = %q, want the plan error output", got.PlanOutput)
+	}
+}
+
+// TestDetectDriftInitFailureWithNoOutputKeepsErrorText covers a missing/unusable executable:
+// CombinedOutput comes back empty, so without the fallback the issue body is an empty fence.
+func TestDetectDriftInitFailureWithNoOutputKeepsErrorText(t *testing.T) {
+	projects := []models.TypedProject{{Dir: "infra/a", Type: models.Terraform}}
+	d := newFailingTestDetector(projects, fakeExecutor{
+		initOutput: "",
+		initErr:    errors.New("exec: \"terraform\": executable file not found in $PATH"),
+	})
+
+	result := d.DetectDrift(context.Background())
+
+	got := result.ProjectResults[0]
+	if got.FailedPhase != PhaseInit {
+		t.Errorf("FailedPhase = %q, want %q", got.FailedPhase, PhaseInit)
+	}
+	if !strings.Contains(got.ErrorOutput(), "executable file not found") {
+		t.Errorf("ErrorOutput() = %q, want it to carry the error text", got.ErrorOutput())
+	}
+}
+
+func TestDetectDriftPlanFailureWithNoOutputKeepsErrorText(t *testing.T) {
+	projects := []models.TypedProject{{Dir: "infra/a", Type: models.Terraform}}
+	d := newFailingTestDetector(projects, fakeExecutor{
+		planOutput: "",
+		planErr:    errors.New("signal: killed"),
+	})
+
+	result := d.DetectDrift(context.Background())
+
+	if got := result.ProjectResults[0].ErrorOutput(); !strings.Contains(got, "signal: killed") {
+		t.Errorf("ErrorOutput() = %q, want it to carry the error text", got)
+	}
+}
+
+func TestDetectDriftSuccessLeavesFailedPhaseEmpty(t *testing.T) {
+	projects := []models.TypedProject{{Dir: "infra/a", Type: models.Terraform}}
+	d, _ := newTestDetector(".", projects, noDriftOutput)
+
+	result := d.DetectDrift(context.Background())
+
+	if got := result.ProjectResults[0].FailedPhase; got != "" {
+		t.Errorf("FailedPhase = %q, want empty for a successful project", got)
 	}
 }

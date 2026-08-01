@@ -123,13 +123,15 @@ func (d *DriftDetector) detectDrift(ctx context.Context, project models.TypedPro
 	if err != nil {
 		log.Info().Msgf("Error running init command in %s: %v", project.Dir, err)
 		log.Info().Msg(output)
-		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false, InitOutput: output, PlanOutput: ""}, err
+		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false,
+			FailedPhase: PhaseInit, InitOutput: orErrorText(output, err), PlanOutput: ""}, err
 	}
 	output, err = executor.Plan(ctx, "-lock=false", "-no-color")
 	if err != nil {
 		log.Info().Msgf("Error running plan command in %s: %v", project.Dir, err)
 		log.Info().Msg(output)
-		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false, InitOutput: "", PlanOutput: executor.ParseErrorOutput(output)}, err
+		return DriftProjectResult{Project: project, Drifted: false, Succeeded: false,
+			FailedPhase: PhasePlan, InitOutput: "", PlanOutput: orErrorText(executor.ParseErrorOutput(output), err)}, err
 	}
 	driftDetected := d.isDriftDetected(output)
 	if driftDetected {
@@ -137,6 +139,15 @@ func (d *DriftDetector) detectDrift(ctx context.Context, project models.TypedPro
 	}
 	result := DriftProjectResult{Project: project, Drifted: driftDetected, Succeeded: true, InitOutput: "", PlanOutput: output}
 	return result, nil
+}
+
+// orErrorText falls back to the error text when the command produced no output, which happens
+// when the executable itself could not be run.
+func orErrorText(output string, err error) string {
+	if strings.TrimSpace(output) == "" && err != nil {
+		return err.Error()
+	}
+	return output
 }
 
 func (d *DriftDetector) isDriftDetected(commandOutput string) bool {
