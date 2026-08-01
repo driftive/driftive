@@ -146,5 +146,12 @@ jobs:
 Driftive supports sending notifications to Slack. To enable this feature, you need to provide a Slack webhook URL.
 ![Slack notification](/assets/slack_notification.png "Slack notification")
 
+The message reports drifted, errored and skipped projects, with the phase (`init` or `plan`) that
+failed on each errored project. When `GITHUB_CONTEXT` and GitHub issues are configured, each
+project links to its issue and the message identifies the source repository.
+
+A notification is sent when a run has drift, has errors, or resolved issues since the last run.
+Fully clean runs stay silent.
+
 
 

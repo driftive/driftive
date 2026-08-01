@@ -41,13 +41,14 @@ var issueBodyTemplate string
 var errorIssueBodyTemplate string
 
 type GithubIssueNotification struct {
-	config     *config.DriftiveConfig
-	repoConfig *repo.DriftiveRepoConfig
-	ghClient   *github.Client
-	scm        vcs.VCS
+	config       *config.DriftiveConfig
+	repoConfig   *repo.DriftiveRepoConfig
+	ghClient     *github.Client
+	scm          vcs.VCS
+	dashboardURL string
 }
 
-func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig, ghOpts vcs.VCS) (*GithubIssueNotification, error) {
+func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.DriftiveRepoConfig, ghOpts vcs.VCS, dashboardURL string) (*GithubIssueNotification, error) {
 	if config.GithubContext.Repository == "" || config.GithubContext.RepositoryOwner == "" {
 		log.Warn().Msg("Github repository or owner not provided. Skipping github notification")
 		return nil, errors.New(ErrRepoNotProvided)
@@ -58,12 +59,12 @@ func NewGithubIssueNotification(config *config.DriftiveConfig, repoConfig *repo.
 		log.Warn().Msg("Github token not provided. Skipping github notification")
 		return nil, err
 	}
-	return &GithubIssueNotification{config: config, repoConfig: repoConfig, ghClient: ghClient, scm: ghOpts}, nil
+	return &GithubIssueNotification{config: config, repoConfig: repoConfig, ghClient: ghClient, scm: ghOpts, dashboardURL: dashboardURL}, nil
 }
 
 func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate string) (*string, error) {
 	projectKind := types.DriftIssueKind
-	if !project.Drifted && !project.Succeeded {
+	if !project.Succeeded {
 		projectKind = types.ErrorIssueKind
 	}
 
@@ -80,13 +81,18 @@ func parseGithubBodyTemplate(project drift.DriftProjectResult, bodyTemplate stri
 		return nil, err
 	}
 
+	output := project.PlanOutput
+	if projectKind == types.ErrorIssueKind {
+		output = project.ErrorOutput()
+	}
+
 	templateArgs := struct {
 		ProjectDir  string
 		Output      string
 		ProjectJSON string
 	}{
 		ProjectDir:  project.Project.Dir,
-		Output:      project.PlanOutput[0:utils.Min(len(project.PlanOutput), maxIssueBodySize)],
+		Output:      utils.TruncateBytes(output, maxIssueBodySize),
 		ProjectJSON: string(projectJson),
 	}
 
@@ -120,11 +126,11 @@ func (g *GithubIssueNotification) Handle(ctx context.Context, analysisResult dri
 
 	log.Info().Msgf("Github issues updated")
 	if g.repoConfig.GitHub.Summary.Enabled {
-		summaryHandler, err := summary.NewGithubSummaryHandler(g.config, g.repoConfig, allOpenIssues)
+		summaryHandler, err := summary.NewGithubSummaryHandler(g.config, g.repoConfig, g.dashboardURL)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to create github summary handler")
 		} else {
-			summaryHandler.UpdateSummary(ctx, state)
+			summaryHandler.UpdateSummary(ctx, analysisResult, state)
 		}
 	} else {
 		log.Info().Msg("Github summary is disabled. Skipping summary update")
@@ -223,6 +229,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 	numOpenErrorIssues = numOpenErrorIssues - len(closedErrorIssues)
 
 	// Create issues for failed projects
+	var rateLimitedErrorDirs []string
 	if g.repoConfig.GitHub.Issues.Errors.Enabled {
 		for _, projectResult := range driftResult.ProjectResults {
 			if !projectResult.Succeeded {
@@ -255,6 +262,9 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 						Kind: types.ErrorIssueKind,
 					})
 				}
+				if createOrUpdateResult.RateLimited {
+					rateLimitedErrorDirs = append(rateLimitedErrorDirs, projectResult.Project.Dir)
+				}
 			}
 		}
 	}
@@ -265,6 +275,7 @@ func (g *GithubIssueNotification) HandleIssues(ctx context.Context,
 
 	return &types.GithubState{
 		RateLimitedDrifts:   rateLimitedProjectDirs,
+		RateLimitedErrors:   rateLimitedErrorDirs,
 		DriftIssuesOpen:     currentDriftedIssues,
 		DriftIssuesResolved: closedDriftIssues,
 		ErrorIssuesOpen:     currentErroredIssues,

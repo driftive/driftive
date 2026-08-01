@@ -43,6 +43,12 @@ type DriftDetector struct {
 	Stash Stash
 }
 
+// Phases reported by DriftProjectResult.FailedPhase.
+const (
+	PhaseInit = "init"
+	PhasePlan = "plan"
+)
+
 type DriftProjectResult struct {
 	Project models.TypedProject `json:"project"`
 	Drifted bool                `json:"drifted"`
@@ -52,6 +58,20 @@ type DriftProjectResult struct {
 	PlanOutput string `json:"plan_output"`
 	// SkippedDueToPR is true if the drift was skipped because there are open PRs modifying the drifted files
 	SkippedDueToPR bool `json:"skipped_due_to_pr"`
+	// FailedPhase is PhaseInit or PhasePlan when Succeeded is false, empty otherwise.
+	FailedPhase string `json:"failed_phase,omitempty"`
+}
+
+// ErrorOutput returns the output explaining why a failed project failed. Only meaningful when
+// Succeeded is false — on a successful drifted project PlanOutput holds the plan, not an error.
+func (r DriftProjectResult) ErrorOutput() string {
+	if r.FailedPhase == PhaseInit && r.InitOutput != "" {
+		return r.InitOutput
+	}
+	if r.PlanOutput != "" {
+		return r.PlanOutput
+	}
+	return r.InitOutput
 }
 
 type DriftDetectionResult struct {

@@ -9,6 +9,7 @@ import (
 	"driftive/pkg/notification/console"
 	"driftive/pkg/notification/driftive"
 	"driftive/pkg/notification/github"
+	"driftive/pkg/notification/github/types"
 	"driftive/pkg/notification/slack"
 	"driftive/pkg/vcs"
 	"github.com/rs/zerolog/log"
@@ -41,12 +42,38 @@ const (
 	notifierFailed  = "failed"
 )
 
-func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisResult drift.DriftDetectionResult) {
-	issuesState := &backend.DriftIssuesState{
-		NumOpenIssues:     -1,
-		NumResolvedIssues: -1,
-		StateUpdated:      false,
+// issuesStateFromGithub converts the GitHub notifier's result into the state the Slack notifier
+// renders. A nil state — GitHub disabled, misconfigured, or failed — keeps the -1 sentinels so
+// Slack cannot claim resolutions it has no evidence for.
+func issuesStateFromGithub(state *types.GithubState) *backend.DriftIssuesState {
+	if state == nil {
+		return &backend.DriftIssuesState{
+			NumOpenIssues:          -1,
+			NumResolvedIssues:      -1,
+			NumOpenErrorIssues:     -1,
+			NumResolvedErrorIssues: -1,
+			StateUpdated:           false,
+		}
 	}
+	return &backend.DriftIssuesState{
+		NumOpenIssues:          len(state.DriftIssuesOpen),
+		NumResolvedIssues:      len(state.DriftIssuesResolved),
+		NumOpenErrorIssues:     len(state.ErrorIssuesOpen),
+		NumResolvedErrorIssues: len(state.ErrorIssuesResolved),
+		StateUpdated:           true,
+	}
+}
+
+func repoSlug(cfg *config.DriftiveConfig) string {
+	if cfg.GithubContext == nil {
+		return ""
+	}
+	return cfg.GithubContext.Repository
+}
+
+func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisResult drift.DriftDetectionResult) {
+	var ghState *types.GithubState
+	issuesState := issuesStateFromGithub(nil)
 
 	driftiveStatus := notifierSkipped
 	githubStatus := notifierSkipped
@@ -73,17 +100,19 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 
 	if h.repoConfig.GitHub.Issues.Enabled && h.driftiveConfig.GithubToken != "" && h.driftiveConfig.GithubContext != nil {
 		log.Info().Msg("Updating Github issues...")
-		gh, err := github.NewGithubIssueNotification(h.driftiveConfig, h.repoConfig, h.vcs)
+		gh, err := github.NewGithubIssueNotification(h.driftiveConfig, h.repoConfig, h.vcs, dashboardURL)
 		if err != nil {
 			githubStatus = notifierFailed
 			log.Error().Err(err).Msg("Failed to construct github issues notifier")
 		} else {
-			_, err := gh.Handle(ctx, analysisResult)
+			state, err := gh.Handle(ctx, analysisResult)
 			if err != nil {
 				githubStatus = notifierFailed
 				log.Error().Err(err).Msg("Failed to update github issues/summary")
 			} else {
 				githubStatus = notifierOk
+				ghState = state
+				issuesState = issuesStateFromGithub(state)
 			}
 		}
 	}
@@ -105,6 +134,9 @@ func (h *NotificationHandler) HandleNotifications(ctx context.Context, analysisR
 			Url:          h.driftiveConfig.SlackWebhookUrl,
 			IssuesState:  issuesState,
 			DashboardURL: dashboardURL,
+			Repo:         repoSlug(h.driftiveConfig),
+			DriftIssues:  ghState.IssueNumbersByDir(types.DriftIssueKind),
+			ErrorIssues:  ghState.IssueNumbersByDir(types.ErrorIssueKind),
 		}
 		err := slackNotification.Handle(ctx, analysisResult)
 		if err != nil {

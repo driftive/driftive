@@ -38,4 +38,24 @@ type GithubState struct {
 	ErrorIssuesResolved []ProjectIssue
 
 	RateLimitedDrifts []string
+	RateLimitedErrors []string
+}
+
+// IssueNumbersByDir indexes the issues still open after this run by project dir, for the given
+// kind. Returns nil when there is no state, so callers can pass the result straight through.
+func (s *GithubState) IssueNumbersByDir(kind string) map[string]int {
+	if s == nil {
+		return nil
+	}
+
+	issues := s.DriftIssuesOpen
+	if kind == ErrorIssueKind {
+		issues = s.ErrorIssuesOpen
+	}
+
+	numbers := make(map[string]int, len(issues))
+	for _, issue := range issues {
+		numbers[issue.Project.Dir] = issue.Issue.Number
+	}
+	return numbers
 }

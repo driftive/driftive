@@ -18,6 +18,9 @@ type mockVCS struct {
 	closedIssueNumbers  []int
 	commentedIssueNums  []int
 	createOrUpdateCalls []types.GithubIssue
+
+	// resultFor overrides what CreateOrUpdateIssue returns. Nil keeps the zero result.
+	resultFor func(types.GithubIssue) vcstypes.CreateOrUpdateResult
 }
 
 func (m *mockVCS) GetAllOpenRepoIssues(_ context.Context) ([]*vcstypes.VCSIssue, error) {
@@ -30,6 +33,9 @@ func (m *mockVCS) GetChangedFilesForAllPRs(_ context.Context) ([]string, error) 
 
 func (m *mockVCS) CreateOrUpdateIssue(_ context.Context, issue types.GithubIssue, _ []*vcstypes.VCSIssue, _ bool) vcstypes.CreateOrUpdateResult {
 	m.createOrUpdateCalls = append(m.createOrUpdateCalls, issue)
+	if m.resultFor != nil {
+		return m.resultFor(issue)
+	}
 	return vcstypes.CreateOrUpdateResult{Created: false, RateLimited: false, Issue: nil}
 }
 

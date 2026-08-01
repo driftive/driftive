@@ -1,23 +1,36 @@
-This issue shows your drift summary.
+# Driftive Summary
 
-## Rate-Limited
+**8 projects** · 🔴 3 drifted · 🟠 2 errored · ⏭️ 1 skipped · 🟢 2 clean
 
-Issues for the following projects were not created due to configured rate limits:
+_Last analysis: 2026-07-31 14:02 UTC · took 4m12s_ · [Dashboard](https://app.driftive.cloud/gh/acme/infra/run/42)
 
-* `projs/project4`
-## Drifts
+## 🔴 Drifted (3)
 
-Drift issues open: 2
+| Project | Issue |
+| --- | --- |
+| `infra/prod/rds` | [#131](../issues/131) |
+| `infra/prod/vpc` | [#128](../issues/128) |
+| `infra/stg/eks` | — _rate limited_ |
 
-* [projs/project1](../issues/1)
-* [projs/project2](../issues/2)
-## Errors
+## 🟠 Errored (2)
 
-Error issues open: 1
+| Project | Failed at | Issue |
+| --- | --- | --- |
+| `infra/prod/iam` | plan | [#132](../issues/132) |
+| `modules/net` | init | — |
 
-* [projs/project3](../issues/3)
-<!--
-summary-state-start
-{"rate_limited_projects":["projs/project4"],"drifted_projects":[{"project":{"dir":"projs/project1"},"issue":{"number":1},"kind":"drift"},{"project":{"dir":"projs/project2"},"issue":{"number":2},"kind":"drift"}],"errored_projects":[{"project":{"dir":"projs/project3"},"issue":{"number":3},"kind":"drift"}],"last_analysis_date":"2021-08-01T03:32:12Z"}
-summary-state-end
--->
+## ⏭️ Skipped — open PR (1)
+
+| Project |
+| --- |
+| `infra/dev/vpc` |
+
+> ℹ️ Some issues were not created because the configured `max_open_issues` limit was reached.
+
+## 🗂️ Other open issues (1)
+
+Open driftive issues the last run did not reproduce.
+
+| Project | Issue |
+| --- | --- |
+| `infra/legacy/dns` | [#97](../issues/97) |
