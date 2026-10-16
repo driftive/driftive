@@ -1,0 +1,8 @@
+auto_discover:
+  enabled: true
+  inclusions:
+    - '**/*.tf'
+settings:
+  non_concurrent_patterns:
+    - 'gcp/confluent/**'
+    - 'aws/heavy-stack'

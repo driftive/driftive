@@ -82,6 +82,7 @@ It supports the following configuration options:
       * `labels` - list of labels to apply to the issues
 * `settings`
   * `skip_if_open_pr` - skip projects with open pull requests
+  * `non_concurrent_patterns` - list of glob patterns, relative to the repository root, matched against project directories. Projects matching the same pattern are analyzed one at a time, while other projects keep running concurrently up to `--concurrency`. Useful for heavyweight (memory/CPU) projects or providers with tight API rate limits. Each pattern is its own group. `gcp/confluent/**` matches projects in subdirectories of `gcp/confluent`. `gcp/confluent` also matches a project located at `gcp/confluent` itself.
   
 
 Example configuration:
@@ -123,6 +124,8 @@ github:
         - "plan-failed"
 settings:
   skip_if_open_pr: true
+  non_concurrent_patterns:
+    - 'gcp/confluent/**' # analyze these projects one at a time (e.g. API rate limits)
 ```
 
 ### Github issues

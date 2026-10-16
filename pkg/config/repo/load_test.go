@@ -41,6 +41,34 @@ func TestLoadConfig(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:     "Non-concurrent patterns",
+			filePath: utils.GetBasePath() + "/testdata/load_config/non_concurrent_patterns_config.yaml",
+			wantConfig: &DriftiveRepoConfig{
+				AutoDiscover: DriftiveRepoConfigAutoDiscover{
+					Enabled: true,
+					Inclusions: []string{
+						"**/*.tf",
+					},
+				},
+				GitHub: DriftiveRepoConfigGitHub{
+					Issues: DriftiveRepoConfigGitHubIssues{
+						MaxOpenIssues: 10,
+						Errors: DriftiveRepoConfigGitHubIssuesErrors{
+							MaxOpenIssues: 5,
+						},
+					},
+					Summary: DriftiveRepoConfigGitHubSummary{
+						IssueTitle: "Driftive Summary",
+					},
+				},
+				Settings: DriftiveRepoConfigSettings{
+					SkipIfOpenPR:          false,
+					NonConcurrentPatterns: []string{"gcp/confluent/**", "aws/heavy-stack"},
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

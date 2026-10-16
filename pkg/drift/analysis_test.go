@@ -11,7 +11,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // fakeExecutor stands in for terraform/tofu/terragrunt so DetectDrift can be exercised
@@ -26,6 +28,10 @@ type fakeExecutor struct {
 	initErr    error
 	planErr    error
 
+	// onInit, when set, runs at the start of Init outside mu, so tests can observe or hold a
+	// project while it is running.
+	onInit func(dir string)
+
 	mu       *sync.Mutex
 	initDirs *[]string
 }
@@ -35,6 +41,9 @@ const noDriftOutput = "Your infrastructure matches the configuration"
 func (f fakeExecutor) Dir() string { return f.dir }
 
 func (f fakeExecutor) Init(_ context.Context, _ ...string) (string, error) {
+	if f.onInit != nil {
+		f.onInit(f.dir)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	*f.initDirs = append(*f.initDirs, f.dir)
@@ -91,6 +100,26 @@ func newFailingTestDetector(projects []models.TypedProject, template fakeExecuto
 		e.mu = &mu
 		e.initDirs = &initDirs
 		return e
+	}
+	return &d
+}
+
+// newNonConcurrentTestDetector wires a detector with the given concurrency and non-concurrent
+// patterns. onInit runs inside each project's Init.
+func newNonConcurrentTestDetector(projects []models.TypedProject, concurrency int, patterns []string, onInit func(dir string)) *DriftDetector {
+	var mu sync.Mutex
+	initDirs := make([]string, 0)
+
+	d := NewDriftDetector(
+		".",
+		projects,
+		&config.DriftiveConfig{Concurrency: concurrency, RepositoryPath: "."},
+		&repo.DriftiveRepoConfig{Settings: repo.DriftiveRepoConfigSettings{NonConcurrentPatterns: patterns}},
+		nil,
+		nil,
+	)
+	d.newExecutor = func(dir string, _ models.ProjectType) exec.Executor {
+		return fakeExecutor{dir: dir, planOutput: noDriftOutput, onInit: onInit, mu: &mu, initDirs: &initDirs}
 	}
 	return &d
 }
@@ -386,5 +415,115 @@ func TestDetectDriftSuccessLeavesFailedPhaseEmpty(t *testing.T) {
 
 	if got := result.ProjectResults[0].FailedPhase; got != "" {
 		t.Errorf("FailedPhase = %q, want empty for a successful project", got)
+	}
+}
+
+func tfProjects(dirs ...string) []models.TypedProject {
+	projects := make([]models.TypedProject, 0, len(dirs))
+	for _, dir := range dirs {
+		projects = append(projects, models.TypedProject{Dir: dir, Type: models.Terraform})
+	}
+	return projects
+}
+
+// TestDetectDriftSerializesNonConcurrentPatterns checks that projects matching the same pattern
+// never overlap, even with free slots. Timing can only hide an overlap, never invent one.
+func TestDetectDriftSerializesNonConcurrentPatterns(t *testing.T) {
+	projects := tfProjects("gcp/confluent/a", "gcp/confluent/b", "gcp/confluent/c", "other/x", "other/y")
+
+	var inFlight, maxInFlight atomic.Int32
+	d := newNonConcurrentTestDetector(projects, 4, []string{"gcp/confluent/**"}, func(dir string) {
+		if !strings.HasPrefix(dir, "gcp/confluent/") {
+			return
+		}
+		n := inFlight.Add(1)
+		for {
+			m := maxInFlight.Load()
+			if n <= m || maxInFlight.CompareAndSwap(m, n) {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+		inFlight.Add(-1)
+	})
+
+	result := d.DetectDrift(context.Background())
+
+	if got := maxInFlight.Load(); got > 1 {
+		t.Errorf("expected at most 1 gcp/confluent project in flight, got %d", got)
+	}
+	if len(result.ProjectResults) != 5 || result.TotalChecked != 5 {
+		t.Errorf("expected all 5 projects checked, got %d result(s), TotalChecked %d",
+			len(result.ProjectResults), result.TotalChecked)
+	}
+}
+
+// TestDetectDriftNonConcurrentDoesNotBlockOthers holds one gcp/confluent project open and checks
+// that the other confluent project waits while unrelated projects still run. Concurrency 2 makes
+// it catch a waiting project that holds a slot: it would leave no slot for other/*.
+func TestDetectDriftNonConcurrentDoesNotBlockOthers(t *testing.T) {
+	projects := tfProjects("gcp/confluent/a", "gcp/confluent/b", "other/x", "other/y")
+
+	unblock := make(chan struct{})
+	firstConfluentStarted := make(chan struct{})
+	var confluentStarted atomic.Int32
+	var othersStarted sync.WaitGroup
+	othersStarted.Add(2)
+
+	d := newNonConcurrentTestDetector(projects, 2, []string{"gcp/confluent/**"}, func(dir string) {
+		if !strings.HasPrefix(dir, "gcp/confluent/") {
+			othersStarted.Done()
+			return
+		}
+		if confluentStarted.Add(1) == 1 {
+			close(firstConfluentStarted)
+			<-unblock
+		}
+	})
+
+	done := make(chan DriftDetectionResult, 1)
+	go func() { done <- d.DetectDrift(context.Background()) }()
+
+	othersDone := make(chan struct{})
+	go func() {
+		othersStarted.Wait()
+		<-firstConfluentStarted
+		close(othersDone)
+	}()
+
+	select {
+	case <-othersDone:
+	case <-time.After(5 * time.Second):
+		close(unblock)
+		t.Fatal("other/* projects did not run while a gcp/confluent project was in flight")
+	}
+
+	if got := confluentStarted.Load(); got != 1 {
+		t.Errorf("expected the second gcp/confluent project to wait, but %d started", got)
+	}
+
+	close(unblock)
+	result := <-done
+	if len(result.ProjectResults) != 4 {
+		t.Errorf("expected all 4 projects checked, got %d", len(result.ProjectResults))
+	}
+}
+
+// TestDetectDriftNonConcurrentCancelledWhileWaiting cancels the run from inside the first project:
+// the project waiting on its group must not be started afterwards.
+func TestDetectDriftNonConcurrentCancelledWhileWaiting(t *testing.T) {
+	projects := tfProjects("gcp/confluent/a", "gcp/confluent/b")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := newNonConcurrentTestDetector(projects, 4, []string{"gcp/confluent/**"}, func(string) {
+		cancel()
+	})
+
+	result := d.DetectDrift(ctx)
+
+	if result.TotalChecked != 1 || len(result.ProjectResults) != 1 {
+		t.Errorf("expected only the first project checked, got TotalChecked %d and %d result(s)",
+			result.TotalChecked, len(result.ProjectResults))
 	}
 }
