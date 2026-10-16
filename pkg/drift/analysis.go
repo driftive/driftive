@@ -4,13 +4,14 @@ import (
 	"context"
 	"driftive/pkg/models"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-func (d *DriftDetector) detectDriftConcurrently(ctx context.Context, project models.TypedProject, projectDir string) {
+func (d *DriftDetector) detectDriftConcurrently(ctx context.Context, project models.TypedProject, projectDir string, groups []int, released chan<- []int) {
 	defer func() {
 		<-d.semaphore
 	}()
@@ -40,6 +41,10 @@ func (d *DriftDetector) detectDriftConcurrently(ctx context.Context, project mod
 	}
 
 	d.results <- result
+
+	// Before the deferred semaphore release, so by the time the dispatcher can take this slot it
+	// can also see the project's non-concurrent groups as free.
+	released <- groups
 }
 
 // relativeProjectDir returns proj relative to the repository root. The repo root itself is
@@ -67,21 +72,62 @@ func (d *DriftDetector) DetectDrift(ctx context.Context) DriftDetectionResult {
 	var totalChecked = 0
 	startTime := time.Now()
 
-	for idx, proj := range d.Projects {
-		projectDir := relativeProjectDir(d.RepoDir, proj.Dir)
+	projectDirs := make([]string, len(d.Projects))
+	for i, proj := range d.Projects {
+		projectDirs[i] = relativeProjectDir(d.RepoDir, proj.Dir)
+	}
 
+	patterns := d.RepoConfig.Settings.NonConcurrentPatterns
+	groups, err := nonConcurrentGroups(patterns, projectDirs)
+	if err != nil {
+		log.Error().Msgf("Invalid non-concurrent patterns, ignoring them: %v", err)
+		patterns = nil
+		groups = make([][]int, len(d.Projects))
+	}
+	if len(patterns) > 0 {
+		matched := 0
+		for _, g := range groups {
+			if len(g) > 0 {
+				matched++
+			}
+		}
+		log.Info().Msgf("%d project(s) matched non-concurrent patterns", matched)
+	}
+
+	// busy is owned by this goroutine; workers hand their groups back through released, which is
+	// buffered for every project so a worker never blocks on it.
+	busy := make([]bool, len(patterns))
+	released := make(chan []int, len(d.Projects))
+	pending := make([]int, len(d.Projects))
+	for i := range pending {
+		pending[i] = i
+	}
+
+	for len(pending) > 0 {
 		// Honor cancellation between projects so an interrupted run doesn't keep
 		// spinning up new terraform/tofu processes after Ctrl-C.
 		if ctx.Err() != nil {
-			log.Info().Msgf("Drift analysis cancelled after %d/%d projects: %v", idx, len(d.Projects), ctx.Err())
+			log.Info().Msgf("Drift analysis cancelled after %d/%d projects: %v", totalChecked, len(d.Projects), ctx.Err())
 			break
 		}
 
-		totalChecked++
-		log.Info().Msgf("Checking drift in project %d/%d: %s (%s)", idx+1, len(d.Projects), projectDir, models.ProjectTypeToStr(proj.Type))
-		d.workerWg.Add(1)
 		d.semaphore <- struct{}{}
-		go d.detectDriftConcurrently(ctx, proj, projectDir)
+		pos := waitForRunnable(ctx, pending, groups, busy, released)
+		if pos < 0 || ctx.Err() != nil {
+			// Cancelled while waiting for a slot or a non-concurrent group; the check above reports it.
+			<-d.semaphore
+			continue
+		}
+
+		idx := pending[pos]
+		pending = slices.Delete(pending, pos, pos+1)
+		setBusy(groups[idx], busy, true)
+
+		proj := d.Projects[idx]
+		totalChecked++
+		log.Info().Msgf("Checking drift in project %d/%d: %s (%s)", totalChecked, len(d.Projects), projectDirs[idx], models.ProjectTypeToStr(proj.Type))
+		d.workerWg.Add(1)
+		go d.detectDriftConcurrently(ctx, proj, projectDirs[idx], groups[idx], released)
 	}
 
 	d.workerWg.Wait()

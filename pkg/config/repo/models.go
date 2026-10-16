@@ -53,6 +53,9 @@ type DriftiveRepoConfig struct {
 type DriftiveRepoConfigSettings struct {
 	// SkipIfOpenPR is used to skip drift notifications if there are open PRs modifying the drifted files
 	SkipIfOpenPR bool `json:"skip_if_open_pr,omitempty" yaml:"skip_if_open_pr,omitempty"`
+	// NonConcurrentPatterns is a list of glob patterns, relative to the repository root. Projects matching
+	// the same pattern are analyzed one at a time; other projects keep running concurrently.
+	NonConcurrentPatterns []string `json:"non_concurrent_patterns,omitempty" yaml:"non_concurrent_patterns,omitempty"`
 }
 
 // DriftiveRepoConfigAutoDiscover is used to configure auto discovery of projects in a repository
